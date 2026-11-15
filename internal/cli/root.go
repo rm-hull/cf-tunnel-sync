@@ -4,9 +4,15 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
+	"sort"
+	"text/tabwriter"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/config"
+	"github.com/rm-hull/cf-tunnel-sync/internal/docker"
+	"github.com/rm-hull/cf-tunnel-sync/internal/labels"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
 )
@@ -87,13 +93,111 @@ func newPlanCmd() *cobra.Command {
 }
 
 func newRulesCmd() *cobra.Command {
-	return &cobra.Command{
+	jsonOut := false
+	cmd := &cobra.Command{
 		Use:   "rules",
 		Short: "Print desired rules from live Docker",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("not implemented")
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg, err := config.Load(cmd.Flag("config").Value.String())
+			if err != nil {
+				return err
+			}
+
+			logLevel := parseLogLevel(cfg.Server.LogLevel)
+			log := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+				Level: logLevel,
+			}))
+
+			api, err := docker.New(cfg.Docker.Host, log)
+			if err != nil {
+				return err
+			}
+
+			rules, issues, err := api.DesiredRules(cmd.Context(), cfg.Labels.Prefixes, cfg.Labels.AllowUnprotectedAccess)
+			if err != nil {
+				return err
+			}
+
+			if jsonOut {
+				return printRulesJSON(cmd.OutOrStdout(), rules, issues)
+			}
+			return printRulesTable(cmd.OutOrStdout(), rules, issues)
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
+	return cmd
+}
+
+func printRulesTable(w io.Writer, rules map[string]labels.Rule, issues []labels.Issue) error {
+	// Sort rules by key for deterministic output
+	keys := make([]string, 0, len(rules))
+	for k := range rules {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "HOST\tPATH\tSERVICE\tCONTAINER\tSOURCE")
+	for _, key := range keys {
+		r := rules[key]
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+			r.Hostname, r.Path, r.Service, r.ContainerName, r.SourcePrefix)
+	}
+	if len(issues) > 0 {
+		fmt.Fprintln(tw)
+		fmt.Fprintln(tw, "ISSUES:")
+		for _, iss := range issues {
+			fmt.Fprintf(tw, "  %s (%s): %s\n", iss.Kind, iss.Container, iss.Detail)
+		}
+	}
+	return tw.Flush()
+}
+
+func printRulesJSON(w io.Writer, rules map[string]labels.Rule, issues []labels.Issue) error {
+	type ruleEntry struct {
+		Key  string      `json:"key"`
+		Rule labels.Rule `json:"rule"`
+	}
+	type issueEntry struct {
+		Kind      string `json:"kind"`
+		Container string `json:"container,omitempty"`
+		Field     string `json:"field,omitempty"`
+		Detail    string `json:"detail"`
+	}
+	type output struct {
+		Rules  []ruleEntry  `json:"rules"`
+		Issues []issueEntry `json:"issues,omitempty"`
+	}
+
+	// Sort rules by key for deterministic output
+	keys := make([]string, 0, len(rules))
+	for k := range rules {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	out := output{}
+	for _, key := range keys {
+		out.Rules = append(out.Rules, ruleEntry{
+			Key:  key,
+			Rule: rules[key],
+		})
+	}
+	for _, iss := range issues {
+		out.Issues = append(out.Issues, issueEntry{
+			Kind:      iss.Kind,
+			Container: iss.Container,
+			Field:     iss.Field,
+			Detail:    iss.Detail,
+		})
+	}
+
+	data, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(w, string(data))
+	return nil
 }
 
 func newConfigCmd(cfgPath *string) *cobra.Command {
@@ -150,6 +254,20 @@ func newHealthcheckCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return fmt.Errorf("not implemented")
 		},
+	}
+}
+
+// parseLogLevel converts a config log level string to slog.Level.
+func parseLogLevel(level string) slog.Level {
+	switch level {
+	case "DEBUG":
+		return slog.LevelDebug
+	case "WARN":
+		return slog.LevelWarn
+	case "ERROR":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
 }
 
