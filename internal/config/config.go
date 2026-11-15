@@ -145,7 +145,7 @@ func Discover(flagPath string) (string, []string, error) {
 
 	// 3. $XDG_CONFIG_DIRS
 	if xdgDirs := os.Getenv("XDG_CONFIG_DIRS"); xdgDirs != "" {
-		for _, dir := range strings.Split(xdgDirs, ":") {
+		for dir := range strings.SplitSeq(xdgDirs, ":") {
 			path := filepath.Join(dir, "cf-tunnel-sync", "config.yaml")
 			if _, err := os.Stat(filepath.Clean(path)); err == nil { //nolint:gosec // path is constructed from safe components
 				return path, searched, nil

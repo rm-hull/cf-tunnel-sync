@@ -149,7 +149,7 @@ func TestRenderIngress_deterministic(t *testing.T) {
 
 	// Render multiple times and compare
 	first := RenderIngress(rules)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		second := RenderIngress(rules)
 		assert.Equal(t, first, second, "render %d produced different output", i+1)
 	}
