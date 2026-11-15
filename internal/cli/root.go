@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"os"
 	"sort"
-	"text/tabwriter"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rm-hull/cf-tunnel-sync/internal/config"
 	"github.com/rm-hull/cf-tunnel-sync/internal/docker"
 	"github.com/rm-hull/cf-tunnel-sync/internal/labels"
@@ -136,21 +136,27 @@ func printRulesTable(w io.Writer, rules map[string]labels.Rule, issues []labels.
 	}
 	sort.Strings(keys)
 
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "HOST\tPATH\tSERVICE\tCONTAINER\tSOURCE")
+	tbl := table.NewWriter()
+	tbl.SetOutputMirror(w)
+	tbl.SetStyle(table.StyleRounded)
+
+	tbl.AppendHeader(table.Row{"HOST", "PATH", "SERVICE", "CONTAINER", "SOURCE"})
 	for _, key := range keys {
 		r := rules[key]
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-			r.Hostname, r.Path, r.Service, r.ContainerName, r.SourcePrefix)
+		tbl.AppendRow(table.Row{r.Hostname, r.Path, r.Service, r.ContainerName, r.SourcePrefix})
 	}
+	if len(keys) > 0 {
+		tbl.Render()
+	}
+
 	if len(issues) > 0 {
-		fmt.Fprintln(tw)
-		fmt.Fprintln(tw, "ISSUES:")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "ISSUES:")
 		for _, iss := range issues {
-			fmt.Fprintf(tw, "  %s (%s): %s\n", iss.Kind, iss.Container, iss.Detail)
+			fmt.Fprintf(w, "  %s (%s): %s\n", iss.Kind, iss.Container, iss.Detail)
 		}
 	}
-	return tw.Flush()
+	return nil
 }
 
 func printRulesJSON(w io.Writer, rules map[string]labels.Rule, issues []labels.Issue) error {
