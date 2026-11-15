@@ -51,6 +51,7 @@ func NewReconcileCmd() *cobra.Command {
 				cfg.Labels.Prefixes,
 				cfg.Reconcile.GracePeriod,
 				reconcile.WithDryRun(dryRun || cfg.Server.DryRun),
+				reconcile.WithCloudflared(cfg.Tunnel.Cloudflared, cfg.Tunnel.ExternalID),
 			)
 
 			res := eng.Run(cmd.Context())
