@@ -2,7 +2,7 @@ $schema: https://raw.githubusercontent.com/rm-hull/cf-tunnel-sync/main/config.sc
 
 server:
   listen: ":5000"
-  log_level: INFO
+  log_level: DEBUG
   state_path: /data/state.json
 
 cloudflare:

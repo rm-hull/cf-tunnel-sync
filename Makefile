@@ -5,7 +5,7 @@ all: build
 
 # Build the binary
 build:
-	go build -o bin/cf-tunnel-sync ./cmd/cf-tunnel-sync
+	go build -o bin/cf-tunnel-sync .
 
 # Run tests
 test:

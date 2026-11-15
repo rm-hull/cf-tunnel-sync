@@ -1,24 +1,38 @@
-package cli_test
+package main_test
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/rm-hull/cf-tunnel-sync/internal/cli"
+	"github.com/rm-hull/cf-tunnel-sync/cmd"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func newTestRoot() *cobra.Command {
+	c := &cobra.Command{Use: "cf-tunnel-sync"}
+	cfgPath := c.PersistentFlags().String("config", "", "path to config file")
+	c.AddCommand(cmd.NewVersionCmd("1.0.0", "abc123"))
+	c.AddCommand(cmd.NewRunCmd())
+	c.AddCommand(cmd.NewReconcileCmd())
+	c.AddCommand(cmd.NewPlanCmd())
+	c.AddCommand(cmd.NewRulesCmd())
+	c.AddCommand(cmd.NewConfigCmd(cfgPath))
+	c.AddCommand(cmd.NewHealthcheckCmd())
+	return c
+}
+
 func TestVersionCommand(t *testing.T) {
-	cmd := cli.NewRootCmd(&cli.Deps{})
-	cmd.SetArgs([]string{"version"})
+	c := newTestRoot()
+	c.SetArgs([]string{"version"})
 
 	var out bytes.Buffer
 	var errOut bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&errOut)
+	c.SetOut(&out)
+	c.SetErr(&errOut)
 
-	require.NoError(t, cmd.Execute())
+	require.NoError(t, c.Execute())
 
 	output := out.String()
 	assert.Contains(t, output, "cf-tunnel-sync")
@@ -26,27 +40,27 @@ func TestVersionCommand(t *testing.T) {
 }
 
 func TestUnknownSubcommand(t *testing.T) {
-	cmd := cli.NewRootCmd(&cli.Deps{})
-	cmd.SetArgs([]string{"nonexistent"})
+	c := newTestRoot()
+	c.SetArgs([]string{"nonexistent"})
 
 	var buf bytes.Buffer
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
+	c.SetOut(&buf)
+	c.SetErr(&buf)
 
-	err := cmd.Execute()
+	err := c.Execute()
 	require.Error(t, err, "expected error for unknown subcommand")
 }
 
 func TestHelpListsSubcommands(t *testing.T) {
-	cmd := cli.NewRootCmd(&cli.Deps{})
-	cmd.SetArgs([]string{"--help"})
+	c := newTestRoot()
+	c.SetArgs([]string{"--help"})
 
 	var buf bytes.Buffer
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
+	c.SetOut(&buf)
+	c.SetErr(&buf)
 
 	// Help command returns a special error in cobra
-	_ = cmd.Execute()
+	_ = c.Execute()
 
 	out := buf.String()
 	expectedCommands := []string{"run", "reconcile", "plan", "rules", "config", "healthcheck"}
@@ -56,10 +70,10 @@ func TestHelpListsSubcommands(t *testing.T) {
 }
 
 func TestConfigSubcommands(t *testing.T) {
-	cmd := cli.NewRootCmd(&cli.Deps{})
+	c := newTestRoot()
 
 	// Check that config subcommands exist
-	configCmd, _, err := cmd.Find([]string{"config"})
+	configCmd, _, err := c.Find([]string{"config"})
 	require.NoError(t, err, "config command not found")
 
 	expectedSubs := []string{"print", "validate", "schema"}
