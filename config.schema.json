@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rm-hull/cf-tunnel-sync/internal/config/config",
+  "properties": {
+    "server": {
+      "properties": {
+        "listen": {
+          "type": "string",
+          "description": "Status page listen address"
+        },
+        "log_level": {
+          "type": "string",
+          "description": "Log level (DEBUG|INFO|WARN|ERROR)"
+        },
+        "log_format": {
+          "type": "string",
+          "description": "Log format (json|text)"
+        },
+        "state_path": {
+          "type": "string",
+          "description": "Path to state file"
+        },
+        "status_refresh": {
+          "type": "string",
+          "description": "Meta-refresh interval; 0 disables"
+        },
+        "metrics": {
+          "type": "boolean",
+          "description": "Expose /metrics endpoint"
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Log actions without making changes"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "listen",
+        "log_level",
+        "log_format",
+        "state_path",
+        "status_refresh",
+        "metrics",
+        "dry_run"
+      ]
+    },
+    "cloudflare": {
+      "properties": {
+        "api_token": {
+          "type": "string",
+          "description": "Cloudflare API token (REQUIRED)"
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Cloudflare account ID (REQUIRED)"
+        },
+        "zone_id": {
+          "type": "string",
+          "description": "Optional fallback zone ID"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "api_token",
+        "account_id",
+        "zone_id"
+      ]
+    },
+    "tunnel": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tunnel name (REQUIRED unless external_id is set)"
+        },
+        "external_id": {
+          "type": "string",
+          "description": "Use externally-run cloudflared"
+        },
+        "cloudflared": {
+          "properties": {
+            "container_name": {
+              "type": "string",
+              "description": "Container name for cloudflared"
+            },
+            "image": {
+              "type": "string",
+              "description": "Cloudflared Docker image"
+            },
+            "network": {
+              "type": "string",
+              "description": "Docker network for cloudflared"
+            },
+            "metrics_port": {
+              "type": "integer",
+              "description": "Metrics port for cloudflared"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "container_name",
+            "image",
+            "network",
+            "metrics_port"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "external_id",
+        "cloudflared"
+      ]
+    },
+    "docker": {
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Docker host (default: DOCKER_HOST / platform socket)"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "host"
+      ]
+    },
+    "labels": {
+      "properties": {
+        "prefixes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Label prefixes to watch"
+        },
+        "allow_unprotected_access": {
+          "type": "boolean",
+          "description": "Allow rules with access labels"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "prefixes",
+        "allow_unprotected_access"
+      ]
+    },
+    "reconcile": {
+      "properties": {
+        "grace_period": {
+          "type": "string",
+          "description": "Removal delay after a rule disappears"
+        },
+        "resync_interval": {
+          "type": "string",
+          "description": "Full resync cadence"
+        },
+        "debounce": {
+          "type": "string",
+          "description": "Debounce interval for triggers"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "grace_period",
+        "resync_interval",
+        "debounce"
+      ]
+    },
+    "dns": {
+      "properties": {
+        "overwrite_conflicts": {
+          "type": "boolean",
+          "description": "Overwrite conflicting DNS records"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "overwrite_conflicts"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "server",
+    "cloudflare",
+    "tunnel",
+    "docker",
+    "labels",
+    "reconcile",
+    "dns"
+  ],
+  "description": "cf-tunnel-sync configuration schema"
+}

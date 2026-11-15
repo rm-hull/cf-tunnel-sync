@@ -1,0 +1,24 @@
+$schema: https://raw.githubusercontent.com/rm-hull/cf-tunnel-sync/main/config.schema.json
+
+server:
+  listen: ":5000"
+  log_level: INFO
+  state_path: /data/state.json
+
+cloudflare:
+  api_token: ${CF_API_TOKEN}
+  account_id: ${CF_ACCOUNT_ID}
+  zone_id: ${CF_ZONE_ID:-}
+
+tunnel:
+  name: homelab
+  cloudflared:
+    network: homelab-net
+    metrics_port: 2000
+
+labels:
+  prefixes: [cloudflare.tunnel, dockflare]
+
+reconcile:
+  grace_period: 8h
+  resync_interval: 5m

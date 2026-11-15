@@ -1,0 +1,11 @@
+server:
+  listen: ":5000"
+
+cloudflare:
+  api_token: ${CF_API_TOKEN}
+  account_id: ${CF_ACCOUNT_ID}
+
+tunnel:
+  name: test-tunnel
+
+unknown_key: value

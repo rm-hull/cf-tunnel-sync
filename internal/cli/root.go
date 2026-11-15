@@ -2,10 +2,13 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
+	"github.com/rm-hull/cf-tunnel-sync/internal/config"
 	"github.com/spf13/cobra"
+	"go.yaml.in/yaml/v3"
 )
 
 // Version and Commit are set by ldflags at build time.
@@ -29,14 +32,14 @@ func NewRootCmd(_ *Deps) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().String("config", "", "path to config file")
+	cfgPath := cmd.PersistentFlags().String("config", "", "path to config file")
 
 	cmd.AddCommand(newVersionCmd())
 	cmd.AddCommand(newRunCmd())
 	cmd.AddCommand(newReconcileCmd())
 	cmd.AddCommand(newPlanCmd())
 	cmd.AddCommand(newRulesCmd())
-	cmd.AddCommand(newConfigCmd())
+	cmd.AddCommand(newConfigCmd(cfgPath))
 	cmd.AddCommand(newHealthcheckCmd())
 
 	return cmd
@@ -93,7 +96,7 @@ func newRulesCmd() *cobra.Command {
 	}
 }
 
-func newConfigCmd() *cobra.Command {
+func newConfigCmd(cfgPath *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Configuration management",
@@ -102,17 +105,39 @@ func newConfigCmd() *cobra.Command {
 	cmd.AddCommand(&cobra.Command{
 		Use:   "print",
 		Short: "Print the effective configuration",
-		RunE:  func(_ *cobra.Command, _ []string) error { return fmt.Errorf("not implemented") },
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg, err := config.Load(*cfgPath)
+			if err != nil {
+				return err
+			}
+			data, err := yaml.Marshal(cfg)
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(cmd.OutOrStdout(), string(data))
+			return nil
+		},
 	})
 	cmd.AddCommand(&cobra.Command{
 		Use:   "validate",
 		Short: "Validate the configuration file",
-		RunE:  func(_ *cobra.Command, _ []string) error { return fmt.Errorf("not implemented") },
+		RunE: func(_ *cobra.Command, _ []string) error {
+			_, err := config.Load(*cfgPath)
+			return err
+		},
 	})
 	cmd.AddCommand(&cobra.Command{
 		Use:   "schema",
 		Short: "Print the JSON schema",
-		RunE:  func(_ *cobra.Command, _ []string) error { return fmt.Errorf("not implemented") },
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			schema := config.Schema()
+			data, err := json.MarshalIndent(schema, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(cmd.OutOrStdout(), string(data))
+			return nil
+		},
 	})
 
 	return cmd
