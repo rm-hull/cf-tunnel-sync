@@ -233,9 +233,8 @@ func (a *mobyAPI) CreateContainer(ctx context.Context, name, image string, cmd [
 		Name:  name,
 		Image: image,
 		Config: &mobycontainer.Config{
-			Cmd:   cmd,
-			Env:   env,
-			Image: image,
+			Cmd: cmd,
+			Env: env,
 		},
 		HostConfig: &mobycontainer.HostConfig{
 			RestartPolicy: mobycontainer.RestartPolicy{
@@ -305,6 +304,7 @@ func (a *mobyAPI) PullImage(ctx context.Context, image string, stdout io.Writer)
 func (a *mobyAPI) FindContainerByName(ctx context.Context, name string) (Container, error) {
 	a.log.Debug("finding container by name", "name", name)
 	result, err := a.client.ContainerList(ctx, mobyclient.ContainerListOptions{
+		All:     true,
 		Filters: mobyclient.Filters{}.Add("name", "^/"+name+"$"),
 	})
 	if err != nil {

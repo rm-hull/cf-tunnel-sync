@@ -2,7 +2,7 @@ $schema: https://raw.githubusercontent.com/rm-hull/cf-tunnel-sync/main/config.sc
 
 server:
   listen: ":5000"
-  log_level: DEBUG
+  log_level: INFO
   state_path: ./testdata/state.json
 
 cloudflare:
@@ -15,6 +15,8 @@ tunnel:
   cloudflared:
     network: test-net
     metrics_port: 2000
+    container_name: cloudflared
+    image: cloudflare/cloudflared:latest
 
 labels:
   prefixes: [cloudflare.tunnel, dockflare]

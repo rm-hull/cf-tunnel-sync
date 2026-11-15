@@ -104,3 +104,42 @@ func EnsureCloudflared(ctx context.Context, api API, cfAPI cf.API,
 	log.Info("cloudflared container created and started", "id", id)
 	return nil
 }
+
+// StopCloudflared stops the cloudflared container if it is running.
+// In external mode (externalID set), it does nothing.
+// In dry-run mode, it logs what it would do without acting.
+func StopCloudflared(ctx context.Context, api API, cfg CloudflaredConfig, externalID string, dryRun bool, log *slog.Logger) error {
+	// External mode: skip container management entirely
+	if externalID != "" {
+		log.Info("external mode, skipping cloudflared container cleanup")
+		return nil
+	}
+
+	existing, err := api.FindContainerByName(ctx, cfg.ContainerName)
+	if err != nil {
+		return fmt.Errorf("find cloudflared container: %w", err)
+	}
+
+	if existing.ID == "" {
+		log.Info("cloudflared container not found, nothing to stop")
+		return nil
+	}
+
+	if existing.State != "running" {
+		log.Info("cloudflared container is not running", "state", existing.State)
+		return nil
+	}
+
+	if dryRun {
+		log.Info("would stop cloudflared container", "id", existing.ID)
+		return nil
+	}
+
+	log.Info("stopping cloudflared container", "id", existing.ID)
+	if err := api.StopContainer(ctx, existing.ID); err != nil {
+		return fmt.Errorf("stop cloudflared container: %w", err)
+	}
+
+	log.Info("cloudflared container stopped", "id", existing.ID)
+	return nil
+}

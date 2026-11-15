@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/cf"
+	"github.com/rm-hull/cf-tunnel-sync/internal/config"
 	"github.com/rm-hull/cf-tunnel-sync/internal/docker"
 	"github.com/rm-hull/cf-tunnel-sync/internal/labels"
 	"github.com/rm-hull/cf-tunnel-sync/internal/rules"
@@ -42,6 +43,10 @@ type Engine struct {
 	prefixes   []string
 	grace      time.Duration
 	dryRun     bool
+
+	// Cloudflared container lifecycle (S8)
+	cloudflaredCfg   config.CloudflaredConfig
+	externalTunnelID string
 }
 
 // Option configures the Engine.
@@ -51,6 +56,14 @@ type Option func(*Engine)
 func WithDryRun(dryRun bool) Option {
 	return func(e *Engine) {
 		e.dryRun = dryRun
+	}
+}
+
+// WithCloudflared configures the cloudflared container lifecycle.
+func WithCloudflared(cfg config.CloudflaredConfig, externalID string) Option {
+	return func(e *Engine) {
+		e.cloudflaredCfg = cfg
+		e.externalTunnelID = externalID
 	}
 }
 
@@ -104,6 +117,20 @@ func (e *Engine) Run(ctx context.Context) Result {
 		return res
 	}
 	res.Tunnel = tunnel
+
+	// 2b. Ensure cloudflared container is running
+	cfCfg := docker.CloudflaredConfig{
+		ContainerName: e.cloudflaredCfg.ContainerName,
+		Image:         e.cloudflaredCfg.Image,
+		Network:       e.cloudflaredCfg.Network,
+		MetricsPort:   e.cloudflaredCfg.MetricsPort,
+	}
+	if cfErr := docker.EnsureCloudflared(ctx, e.dockerAPI, e.cfAPI, tunnel.ID,
+		cfCfg, e.externalTunnelID, e.dryRun, e.log,
+	); cfErr != nil {
+		e.log.Error("ensure cloudflared", "error", cfErr)
+		// Don't abort the pass; continue with ingress/DNS reconciliation
+	}
 
 	// 3. Discover desired rules from Docker
 	desiredLabels, issues, err := e.dockerAPI.DesiredRules(ctx, e.prefixes, false)
