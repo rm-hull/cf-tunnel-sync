@@ -1,15 +1,13 @@
 package config
 
 import (
-	"github.com/invopop/jsonschema"
+	"github.com/alecthomas/jsonschema"
 )
 
 // Schema generates the JSON schema for Config.
+// Field descriptions come from `descr` struct tags collected by buildCommentMap().
 func Schema() *jsonschema.Schema {
-	reflector := jsonschema.Reflector{
-		AllowAdditionalProperties: false,
-		DoNotReference:            true,
-	}
+	reflector := reflectorWithComments()
 	schema := reflector.Reflect(&Config{})
 	schema.Description = "cf-tunnel-sync configuration schema"
 	return schema

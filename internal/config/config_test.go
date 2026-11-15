@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/config"
 	"github.com/stretchr/testify/assert"
@@ -31,9 +32,9 @@ func TestDefaults(t *testing.T) {
 	assert.Equal(t, []string{"cloudflare.tunnel", "dockflare"}, cfg.Labels.Prefixes)
 	assert.False(t, cfg.Labels.AllowUnprotectedAccess)
 
-	assert.Equal(t, "8h", cfg.Reconcile.GracePeriod)
-	assert.Equal(t, "5m", cfg.Reconcile.ResyncInterval)
-	assert.Equal(t, "2s", cfg.Reconcile.Debounce)
+	assert.Equal(t, 8*time.Hour, cfg.Reconcile.GracePeriod)
+	assert.Equal(t, 5*time.Minute, cfg.Reconcile.ResyncInterval)
+	assert.Equal(t, 2*time.Second, cfg.Reconcile.Debounce)
 
 	assert.False(t, cfg.DNS.OverwriteConflicts)
 }
@@ -282,11 +283,11 @@ func TestValidation(t *testing.T) {
 		assert.Contains(t, err.Error(), "server.listen")
 	})
 
-	t.Run("invalid grace period", func(t *testing.T) {
+	t.Run("negative grace period", func(t *testing.T) {
 		cfg := config.Defaults()
 		cfg.Cloudflare.APIToken = "test"
 		cfg.Cloudflare.AccountID = "test"
-		cfg.Reconcile.GracePeriod = "invalid"
+		cfg.Reconcile.GracePeriod = -1 * time.Hour
 		err := config.Validate(&cfg, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "reconcile.grace_period")
@@ -296,7 +297,7 @@ func TestValidation(t *testing.T) {
 		cfg := config.Defaults()
 		cfg.Cloudflare.APIToken = "test"
 		cfg.Cloudflare.AccountID = "test"
-		cfg.Reconcile.ResyncInterval = "5s"
+		cfg.Reconcile.ResyncInterval = 5 * time.Second
 		err := config.Validate(&cfg, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "reconcile.resync_interval")

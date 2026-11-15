@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/cf"
 	"github.com/rm-hull/cf-tunnel-sync/internal/config"
@@ -42,21 +40,6 @@ func NewRunCmd() *cobra.Command {
 				return err
 			}
 
-			grace, err := time.ParseDuration(cfg.Reconcile.GracePeriod)
-			if err != nil {
-				return fmt.Errorf("parse grace_period: %w", err)
-			}
-
-			debounce, err := time.ParseDuration(cfg.Reconcile.Debounce)
-			if err != nil {
-				return fmt.Errorf("parse debounce: %w", err)
-			}
-
-			resyncInterval, err := time.ParseDuration(cfg.Reconcile.ResyncInterval)
-			if err != nil {
-				return fmt.Errorf("parse resync_interval: %w", err)
-			}
-
 			eng := reconcile.New(
 				log,
 				dockerAPI,
@@ -64,7 +47,7 @@ func NewRunCmd() *cobra.Command {
 				cfg.Server.StatePath,
 				cfg.Tunnel.Name,
 				cfg.Labels.Prefixes,
-				grace,
+				cfg.Reconcile.GracePeriod,
 				reconcile.WithDryRun(dryRun || cfg.Server.DryRun),
 				reconcile.WithCloudflared(cfg.Tunnel.Cloudflared, cfg.Tunnel.ExternalID),
 			)
@@ -75,8 +58,8 @@ func NewRunCmd() *cobra.Command {
 				dockerAPI,
 				cfAPI,
 				reconcile.DaemonConfig{
-					Debounce:       debounce,
-					ResyncInterval: resyncInterval,
+					Debounce:       cfg.Reconcile.Debounce,
+					ResyncInterval: cfg.Reconcile.ResyncInterval,
 				},
 				cfg.Tunnel.Cloudflared,
 				cfg.Tunnel.ExternalID,
@@ -111,9 +94,9 @@ func NewRunCmd() *cobra.Command {
 
 			log.Info("starting daemon",
 				"tunnel", cfg.Tunnel.Name,
-				"debounce_ms", float64(debounce.Microseconds())/1e3,
-				"resync_interval_ms", float64(resyncInterval.Microseconds())/1e3,
-				"grace_period_ms", float64(grace.Microseconds())/1e3,
+				"debounce", cfg.Reconcile.Debounce,
+				"resync_interval", cfg.Reconcile.ResyncInterval,
+				"grace_period", cfg.Reconcile.GracePeriod,
 				"dry_run", dryRun || cfg.Server.DryRun,
 			)
 

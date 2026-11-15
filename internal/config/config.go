@@ -16,69 +16,69 @@ import (
 
 // Config holds the full application configuration.
 type Config struct {
-	Server     ServerConfig     `yaml:"server" json:"server"`
-	Cloudflare CloudflareConfig `yaml:"cloudflare" json:"cloudflare"`
-	Tunnel     TunnelConfig     `yaml:"tunnel" json:"tunnel"`
-	Docker     DockerConfig     `yaml:"docker" json:"docker"`
-	Labels     LabelsConfig     `yaml:"labels" json:"labels"`
-	Reconcile  ReconcileConfig  `yaml:"reconcile" json:"reconcile"`
-	DNS        DNSConfig        `yaml:"dns" json:"dns"`
+	Server     ServerConfig     `yaml:"server" json:"server" descr:"Server and logging settings."`
+	Cloudflare CloudflareConfig `yaml:"cloudflare" json:"cloudflare" descr:"Cloudflare API credentials."`
+	Tunnel     TunnelConfig     `yaml:"tunnel" json:"tunnel" descr:"Tunnel and cloudflared container settings."`
+	Docker     DockerConfig     `yaml:"docker" json:"docker" descr:"Docker API connection settings."`
+	Labels     LabelsConfig     `yaml:"labels" json:"labels" descr:"Docker label parsing settings."`
+	Reconcile  ReconcileConfig  `yaml:"reconcile" json:"reconcile" descr:"Reconciliation loop timing settings."`
+	DNS        DNSConfig        `yaml:"dns" json:"dns" descr:"DNS record management settings."`
 }
 
 // ServerConfig holds server-related settings.
 type ServerConfig struct {
-	Listen        string `yaml:"listen" json:"listen" jsonschema:"description=Status page listen address"`
-	LogLevel      string `yaml:"log_level" json:"log_level" jsonschema:"description=Log level (DEBUG|INFO|WARN|ERROR)"`
-	LogFormat     string `yaml:"log_format" json:"log_format" jsonschema:"description=Log format (json|text)"`
-	StatePath     string `yaml:"state_path" json:"state_path" jsonschema:"description=Path to state file"`
-	StatusRefresh string `yaml:"status_refresh" json:"status_refresh" jsonschema:"description=Meta-refresh interval; 0 disables"`
-	Metrics       bool   `yaml:"metrics" json:"metrics" jsonschema:"description=Expose /metrics endpoint"`
-	DryRun        bool   `yaml:"dry_run" json:"dry_run" jsonschema:"description=Log actions without making changes"`
+	Listen        string `yaml:"listen" json:"listen" descr:"HTTP listen address for the status page (e.g., :5000)."`
+	LogLevel      string `yaml:"log_level" json:"log_level" descr:"Log level: DEBUG, INFO, WARN, or ERROR."`
+	LogFormat     string `yaml:"log_format" json:"log_format" descr:"Log output format: json or text."`
+	StatePath     string `yaml:"state_path" json:"state_path" descr:"File path for persistent state (JSON)."`
+	StatusRefresh string `yaml:"status_refresh" json:"status_refresh" descr:"Meta-refresh interval for the status page; 0 disables auto-refresh."`
+	Metrics       bool   `yaml:"metrics" json:"metrics" descr:"Enable the Prometheus /metrics endpoint."`
+	DryRun        bool   `yaml:"dry_run" json:"dry_run" descr:"Log actions without making any API changes."`
 }
 
 // CloudflareConfig holds Cloudflare API settings.
 type CloudflareConfig struct {
-	APIToken  Secret `yaml:"api_token" json:"api_token" jsonschema:"description=Cloudflare API token (REQUIRED)"`
-	AccountID string `yaml:"account_id" json:"account_id" jsonschema:"description=Cloudflare account ID (REQUIRED)"`
-	ZoneID    string `yaml:"zone_id" json:"zone_id" jsonschema:"description=Optional fallback zone ID"`
+	APIToken  Secret `yaml:"api_token" json:"api_token" descr:"Cloudflare API token with Tunnel edit permissions (REQUIRED)."`
+	AccountID string `yaml:"account_id" json:"account_id" descr:"Cloudflare account ID for tunnel creation (REQUIRED)."`
+	ZoneID    string `yaml:"zone_id" json:"zone_id" descr:"Optional fallback zone ID when zone detection fails."`
 }
 
 // TunnelConfig holds tunnel-related settings.
 type TunnelConfig struct {
-	Name        string            `yaml:"name" json:"name" jsonschema:"description=Tunnel name (REQUIRED unless external_id is set)"`
-	ExternalID  string            `yaml:"external_id" json:"external_id" jsonschema:"description=Use externally-run cloudflared"`
-	Cloudflared CloudflaredConfig `yaml:"cloudflared" json:"cloudflared"`
+	Name        string            `yaml:"name" json:"name" descr:"Tunnel name used for Cloudflare tunnel resource (REQUIRED unless external_id is set)."`
+	ExternalID  string            `yaml:"external_id" json:"external_id" descr:"UUID of an externally-managed tunnel; skips cloudflared container lifecycle."`
+	Cloudflared CloudflaredConfig `yaml:"cloudflared" json:"cloudflared" descr:"Cloudflared container configuration."`
 }
 
 // CloudflaredConfig holds cloudflared container settings.
 type CloudflaredConfig struct {
-	ContainerName string `yaml:"container_name" json:"container_name" jsonschema:"description=Container name for cloudflared"`
-	Image         string `yaml:"image" json:"image" jsonschema:"description=Cloudflared Docker image"`
-	Network       string `yaml:"network" json:"network" jsonschema:"description=Docker network for cloudflared"`
-	MetricsPort   int    `yaml:"metrics_port" json:"metrics_port" jsonschema:"description=Metrics port for cloudflared"`
+	ContainerName string `yaml:"container_name" json:"container_name" descr:"Docker container name for the cloudflared process."`
+	Image         string `yaml:"image" json:"image" descr:"Docker image for cloudflared (e.g., cloudflare/cloudflared:latest)."`
+	Network       string `yaml:"network" json:"network" descr:"Docker network the cloudflared container joins."`
+	MetricsPort   int    `yaml:"metrics_port" json:"metrics_port" descr:"TCP port exposed by cloudflared for Prometheus metrics."`
 }
 
 // DockerConfig holds Docker API settings.
 type DockerConfig struct {
-	Host string `yaml:"host" json:"host" jsonschema:"description=Docker host (default: DOCKER_HOST / platform socket)"`
+	Host string `yaml:"host" json:"host" descr:"Docker daemon socket or TCP address (defaults to DOCKER_HOST or platform default)."`
 }
 
 // LabelsConfig holds label parsing settings.
 type LabelsConfig struct {
-	Prefixes               []string `yaml:"prefixes" json:"prefixes" jsonschema:"description=Label prefixes to watch"`
-	AllowUnprotectedAccess bool     `yaml:"allow_unprotected_access" json:"allow_unprotected_access" jsonschema:"description=Allow rules with access labels"`
+	Prefixes               []string `yaml:"prefixes" json:"prefixes" descr:"Label key prefixes to scan for tunnel rules (e.g., cloudflare.tunnel, dockflare)."`
+	AllowUnprotectedAccess bool     `yaml:"allow_unprotected_access" json:"allow_unprotected_access" descr:"Allow rules that reference Cloudflare Access-protected zones without credentials."`
 }
 
 // ReconcileConfig holds reconciliation settings.
 type ReconcileConfig struct {
-	GracePeriod    string `yaml:"grace_period" json:"grace_period" jsonschema:"description=Removal delay after a rule disappears"`
-	ResyncInterval string `yaml:"resync_interval" json:"resync_interval" jsonschema:"description=Full resync cadence"`
-	Debounce       string `yaml:"debounce" json:"debounce" jsonschema:"description=Debounce interval for triggers"`
+	GracePeriod    time.Duration `yaml:"grace_period" json:"grace_period" descr:"Time to wait before removing a rule after its container disappears (e.g., 8h)."`
+	ResyncInterval time.Duration `yaml:"resync_interval" json:"resync_interval" descr:"Interval between full reconciliation passes (e.g., 5m)."`
+	Debounce       time.Duration `yaml:"debounce" json:"debounce" descr:"Debounce window for Docker events; burst events produce one pass (e.g., 2s)."`
 }
 
 // DNSConfig holds DNS settings.
 type DNSConfig struct {
-	OverwriteConflicts bool `yaml:"overwrite_conflicts" json:"overwrite_conflicts" jsonschema:"description=Overwrite conflicting DNS records"`
+	OverwriteConflicts bool `yaml:"overwrite_conflicts" json:"overwrite_conflicts" descr:"Automatically overwrite existing DNS CNAME records that conflict with tunnel rules."`
 }
 
 // Defaults returns a Config with default values.
@@ -116,9 +116,9 @@ func Defaults() Config {
 			AllowUnprotectedAccess: false,
 		},
 		Reconcile: ReconcileConfig{
-			GracePeriod:    "8h",
-			ResyncInterval: "5m",
-			Debounce:       "2s",
+			GracePeriod:    8 * time.Hour,
+			ResyncInterval: 5 * time.Minute,
+			Debounce:       2 * time.Second,
 		},
 		DNS: DNSConfig{
 			OverwriteConflicts: false,
@@ -303,20 +303,16 @@ func Validate(cfg *Config, searchedPaths []string) error {
 	}
 
 	// Duration validation
-	if d, err := time.ParseDuration(cfg.Reconcile.GracePeriod); err != nil {
-		errs = append(errs, fmt.Sprintf("reconcile.grace_period: invalid duration: %v", err))
-	} else if d < 0 {
+	if cfg.Reconcile.GracePeriod < 0 {
 		errs = append(errs, "reconcile.grace_period: must be >= 0")
 	}
 
-	if d, err := time.ParseDuration(cfg.Reconcile.ResyncInterval); err != nil {
-		errs = append(errs, fmt.Sprintf("reconcile.resync_interval: invalid duration: %v", err))
-	} else if d < 10*time.Second {
+	if cfg.Reconcile.ResyncInterval < 10*time.Second {
 		errs = append(errs, "reconcile.resync_interval: must be >= 10s")
 	}
 
-	if _, err := time.ParseDuration(cfg.Reconcile.Debounce); err != nil {
-		errs = append(errs, fmt.Sprintf("reconcile.debounce: invalid duration: %v", err))
+	if cfg.Reconcile.Debounce < 0 {
+		errs = append(errs, "reconcile.debounce: must be >= 0")
 	}
 
 	// Metrics port validation

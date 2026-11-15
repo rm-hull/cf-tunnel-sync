@@ -355,13 +355,11 @@ func TestDaemon_graceful_shutdown(t *testing.T) {
 
 	passComplete := make(chan struct{})
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		daemon.Run(ctx)
 		close(passComplete)
-	}()
+	})
 
 	// Trigger a pass
 	stream.sendEvent("start")

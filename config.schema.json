@@ -1,193 +1,4 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/rm-hull/cf-tunnel-sync/internal/config/config",
-  "properties": {
-    "server": {
-      "properties": {
-        "listen": {
-          "type": "string",
-          "description": "Status page listen address"
-        },
-        "log_level": {
-          "type": "string",
-          "description": "Log level (DEBUG|INFO|WARN|ERROR)"
-        },
-        "log_format": {
-          "type": "string",
-          "description": "Log format (json|text)"
-        },
-        "state_path": {
-          "type": "string",
-          "description": "Path to state file"
-        },
-        "status_refresh": {
-          "type": "string",
-          "description": "Meta-refresh interval; 0 disables"
-        },
-        "metrics": {
-          "type": "boolean",
-          "description": "Expose /metrics endpoint"
-        },
-        "dry_run": {
-          "type": "boolean",
-          "description": "Log actions without making changes"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "listen",
-        "log_level",
-        "log_format",
-        "state_path",
-        "status_refresh",
-        "metrics",
-        "dry_run"
-      ]
-    },
-    "cloudflare": {
-      "properties": {
-        "api_token": {
-          "type": "string",
-          "description": "Cloudflare API token (REQUIRED)"
-        },
-        "account_id": {
-          "type": "string",
-          "description": "Cloudflare account ID (REQUIRED)"
-        },
-        "zone_id": {
-          "type": "string",
-          "description": "Optional fallback zone ID"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "api_token",
-        "account_id",
-        "zone_id"
-      ]
-    },
-    "tunnel": {
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Tunnel name (REQUIRED unless external_id is set)"
-        },
-        "external_id": {
-          "type": "string",
-          "description": "Use externally-run cloudflared"
-        },
-        "cloudflared": {
-          "properties": {
-            "container_name": {
-              "type": "string",
-              "description": "Container name for cloudflared"
-            },
-            "image": {
-              "type": "string",
-              "description": "Cloudflared Docker image"
-            },
-            "network": {
-              "type": "string",
-              "description": "Docker network for cloudflared"
-            },
-            "metrics_port": {
-              "type": "integer",
-              "description": "Metrics port for cloudflared"
-            }
-          },
-          "additionalProperties": false,
-          "type": "object",
-          "required": [
-            "container_name",
-            "image",
-            "network",
-            "metrics_port"
-          ]
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "external_id",
-        "cloudflared"
-      ]
-    },
-    "docker": {
-      "properties": {
-        "host": {
-          "type": "string",
-          "description": "Docker host (default: DOCKER_HOST / platform socket)"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "host"
-      ]
-    },
-    "labels": {
-      "properties": {
-        "prefixes": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array",
-          "description": "Label prefixes to watch"
-        },
-        "allow_unprotected_access": {
-          "type": "boolean",
-          "description": "Allow rules with access labels"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "prefixes",
-        "allow_unprotected_access"
-      ]
-    },
-    "reconcile": {
-      "properties": {
-        "grace_period": {
-          "type": "string",
-          "description": "Removal delay after a rule disappears"
-        },
-        "resync_interval": {
-          "type": "string",
-          "description": "Full resync cadence"
-        },
-        "debounce": {
-          "type": "string",
-          "description": "Debounce interval for triggers"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "grace_period",
-        "resync_interval",
-        "debounce"
-      ]
-    },
-    "dns": {
-      "properties": {
-        "overwrite_conflicts": {
-          "type": "boolean",
-          "description": "Overwrite conflicting DNS records"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "overwrite_conflicts"
-      ]
-    }
-  },
-  "additionalProperties": false,
-  "type": "object",
   "required": [
     "server",
     "cloudflare",
@@ -197,5 +8,647 @@
     "reconcile",
     "dns"
   ],
-  "description": "cf-tunnel-sync configuration schema"
+  "properties": {
+    "server": {
+      "required": [
+        "listen",
+        "log_level",
+        "log_format",
+        "state_path",
+        "status_refresh",
+        "metrics",
+        "dry_run"
+      ],
+      "properties": {
+        "listen": {
+          "type": "string",
+          "description": "HTTP listen address for the status page (e.g., :5000)."
+        },
+        "log_level": {
+          "type": "string",
+          "description": "Log level: DEBUG, INFO, WARN, or ERROR."
+        },
+        "log_format": {
+          "type": "string",
+          "description": "Log output format: json or text."
+        },
+        "state_path": {
+          "type": "string",
+          "description": "File path for persistent state (JSON)."
+        },
+        "status_refresh": {
+          "type": "string",
+          "description": "Meta-refresh interval for the status page; 0 disables auto-refresh."
+        },
+        "metrics": {
+          "type": "boolean",
+          "description": "Enable the Prometheus /metrics endpoint."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Log actions without making any API changes."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Server and logging settings."
+    },
+    "cloudflare": {
+      "required": [
+        "api_token",
+        "account_id",
+        "zone_id"
+      ],
+      "properties": {
+        "api_token": {
+          "type": "string",
+          "description": "Cloudflare API token with Tunnel edit permissions (REQUIRED)."
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Cloudflare account ID for tunnel creation (REQUIRED)."
+        },
+        "zone_id": {
+          "type": "string",
+          "description": "Optional fallback zone ID when zone detection fails."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Cloudflare API credentials."
+    },
+    "tunnel": {
+      "required": [
+        "name",
+        "external_id",
+        "cloudflared"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tunnel name used for Cloudflare tunnel resource (REQUIRED unless external_id is set)."
+        },
+        "external_id": {
+          "type": "string",
+          "description": "UUID of an externally-managed tunnel; skips cloudflared container lifecycle."
+        },
+        "cloudflared": {
+          "required": [
+            "container_name",
+            "image",
+            "network",
+            "metrics_port"
+          ],
+          "properties": {
+            "container_name": {
+              "type": "string",
+              "description": "Docker container name for the cloudflared process."
+            },
+            "image": {
+              "type": "string",
+              "description": "Docker image for cloudflared (e.g., cloudflare/cloudflared:latest)."
+            },
+            "network": {
+              "type": "string",
+              "description": "Docker network the cloudflared container joins."
+            },
+            "metrics_port": {
+              "type": "integer",
+              "description": "TCP port exposed by cloudflared for Prometheus metrics."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Cloudflared container configuration."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Tunnel and cloudflared container settings."
+    },
+    "docker": {
+      "required": [
+        "host"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Docker daemon socket or TCP address (defaults to DOCKER_HOST or platform default)."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Docker API connection settings."
+    },
+    "labels": {
+      "required": [
+        "prefixes",
+        "allow_unprotected_access"
+      ],
+      "properties": {
+        "prefixes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Label key prefixes to scan for tunnel rules (e.g., cloudflare.tunnel, dockflare)."
+        },
+        "allow_unprotected_access": {
+          "type": "boolean",
+          "description": "Allow rules that reference Cloudflare Access-protected zones without credentials."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Docker label parsing settings."
+    },
+    "reconcile": {
+      "required": [
+        "grace_period",
+        "resync_interval",
+        "debounce"
+      ],
+      "properties": {
+        "grace_period": {
+          "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "description": "Time to wait before removing a rule after its container disappears (e.g., 8h).",
+          "format": "duration"
+        },
+        "resync_interval": {
+          "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "description": "Interval between full reconciliation passes (e.g., 5m).",
+          "format": "duration"
+        },
+        "debounce": {
+          "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "description": "Debounce window for Docker events; burst events produce one pass (e.g., 2s).",
+          "format": "duration"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Reconciliation loop timing settings."
+    },
+    "dns": {
+      "required": [
+        "overwrite_conflicts"
+      ],
+      "properties": {
+        "overwrite_conflicts": {
+          "type": "boolean",
+          "description": "Automatically overwrite existing DNS CNAME records that conflict with tunnel rules."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "DNS record management settings."
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "description": "cf-tunnel-sync configuration schema",
+  "definitions": {
+    "CloudflareConfig": {
+      "required": [
+        "api_token",
+        "account_id",
+        "zone_id"
+      ],
+      "properties": {
+        "api_token": {
+          "type": "string",
+          "description": "Cloudflare API token with Tunnel edit permissions (REQUIRED)."
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Cloudflare account ID for tunnel creation (REQUIRED)."
+        },
+        "zone_id": {
+          "type": "string",
+          "description": "Optional fallback zone ID when zone detection fails."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Cloudflare API credentials."
+    },
+    "CloudflaredConfig": {
+      "required": [
+        "container_name",
+        "image",
+        "network",
+        "metrics_port"
+      ],
+      "properties": {
+        "container_name": {
+          "type": "string",
+          "description": "Docker container name for the cloudflared process."
+        },
+        "image": {
+          "type": "string",
+          "description": "Docker image for cloudflared (e.g., cloudflare/cloudflared:latest)."
+        },
+        "network": {
+          "type": "string",
+          "description": "Docker network the cloudflared container joins."
+        },
+        "metrics_port": {
+          "type": "integer",
+          "description": "TCP port exposed by cloudflared for Prometheus metrics."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Cloudflared container configuration."
+    },
+    "Config": {
+      "required": [
+        "server",
+        "cloudflare",
+        "tunnel",
+        "docker",
+        "labels",
+        "reconcile",
+        "dns"
+      ],
+      "properties": {
+        "server": {
+          "required": [
+            "listen",
+            "log_level",
+            "log_format",
+            "state_path",
+            "status_refresh",
+            "metrics",
+            "dry_run"
+          ],
+          "properties": {
+            "listen": {
+              "type": "string",
+              "description": "HTTP listen address for the status page (e.g., :5000)."
+            },
+            "log_level": {
+              "type": "string",
+              "description": "Log level: DEBUG, INFO, WARN, or ERROR."
+            },
+            "log_format": {
+              "type": "string",
+              "description": "Log output format: json or text."
+            },
+            "state_path": {
+              "type": "string",
+              "description": "File path for persistent state (JSON)."
+            },
+            "status_refresh": {
+              "type": "string",
+              "description": "Meta-refresh interval for the status page; 0 disables auto-refresh."
+            },
+            "metrics": {
+              "type": "boolean",
+              "description": "Enable the Prometheus /metrics endpoint."
+            },
+            "dry_run": {
+              "type": "boolean",
+              "description": "Log actions without making any API changes."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Server and logging settings."
+        },
+        "cloudflare": {
+          "required": [
+            "api_token",
+            "account_id",
+            "zone_id"
+          ],
+          "properties": {
+            "api_token": {
+              "type": "string",
+              "description": "Cloudflare API token with Tunnel edit permissions (REQUIRED)."
+            },
+            "account_id": {
+              "type": "string",
+              "description": "Cloudflare account ID for tunnel creation (REQUIRED)."
+            },
+            "zone_id": {
+              "type": "string",
+              "description": "Optional fallback zone ID when zone detection fails."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Cloudflare API credentials."
+        },
+        "tunnel": {
+          "required": [
+            "name",
+            "external_id",
+            "cloudflared"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Tunnel name used for Cloudflare tunnel resource (REQUIRED unless external_id is set)."
+            },
+            "external_id": {
+              "type": "string",
+              "description": "UUID of an externally-managed tunnel; skips cloudflared container lifecycle."
+            },
+            "cloudflared": {
+              "required": [
+                "container_name",
+                "image",
+                "network",
+                "metrics_port"
+              ],
+              "properties": {
+                "container_name": {
+                  "type": "string",
+                  "description": "Docker container name for the cloudflared process."
+                },
+                "image": {
+                  "type": "string",
+                  "description": "Docker image for cloudflared (e.g., cloudflare/cloudflared:latest)."
+                },
+                "network": {
+                  "type": "string",
+                  "description": "Docker network the cloudflared container joins."
+                },
+                "metrics_port": {
+                  "type": "integer",
+                  "description": "TCP port exposed by cloudflared for Prometheus metrics."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "description": "Cloudflared container configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Tunnel and cloudflared container settings."
+        },
+        "docker": {
+          "required": [
+            "host"
+          ],
+          "properties": {
+            "host": {
+              "type": "string",
+              "description": "Docker daemon socket or TCP address (defaults to DOCKER_HOST or platform default)."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Docker API connection settings."
+        },
+        "labels": {
+          "required": [
+            "prefixes",
+            "allow_unprotected_access"
+          ],
+          "properties": {
+            "prefixes": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "description": "Label key prefixes to scan for tunnel rules (e.g., cloudflare.tunnel, dockflare)."
+            },
+            "allow_unprotected_access": {
+              "type": "boolean",
+              "description": "Allow rules that reference Cloudflare Access-protected zones without credentials."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Docker label parsing settings."
+        },
+        "reconcile": {
+          "required": [
+            "grace_period",
+            "resync_interval",
+            "debounce"
+          ],
+          "properties": {
+            "grace_period": {
+              "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+              "type": "string",
+              "description": "Time to wait before removing a rule after its container disappears (e.g., 8h).",
+              "format": "duration"
+            },
+            "resync_interval": {
+              "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+              "type": "string",
+              "description": "Interval between full reconciliation passes (e.g., 5m).",
+              "format": "duration"
+            },
+            "debounce": {
+              "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+              "type": "string",
+              "description": "Debounce window for Docker events; burst events produce one pass (e.g., 2s).",
+              "format": "duration"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Reconciliation loop timing settings."
+        },
+        "dns": {
+          "required": [
+            "overwrite_conflicts"
+          ],
+          "properties": {
+            "overwrite_conflicts": {
+              "type": "boolean",
+              "description": "Automatically overwrite existing DNS CNAME records that conflict with tunnel rules."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "DNS record management settings."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "cf-tunnel-sync configuration schema"
+    },
+    "DNSConfig": {
+      "required": [
+        "overwrite_conflicts"
+      ],
+      "properties": {
+        "overwrite_conflicts": {
+          "type": "boolean",
+          "description": "Automatically overwrite existing DNS CNAME records that conflict with tunnel rules."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "DNS record management settings."
+    },
+    "DockerConfig": {
+      "required": [
+        "host"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Docker daemon socket or TCP address (defaults to DOCKER_HOST or platform default)."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Docker API connection settings."
+    },
+    "LabelsConfig": {
+      "required": [
+        "prefixes",
+        "allow_unprotected_access"
+      ],
+      "properties": {
+        "prefixes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Label key prefixes to scan for tunnel rules (e.g., cloudflare.tunnel, dockflare)."
+        },
+        "allow_unprotected_access": {
+          "type": "boolean",
+          "description": "Allow rules that reference Cloudflare Access-protected zones without credentials."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Docker label parsing settings."
+    },
+    "ReconcileConfig": {
+      "required": [
+        "grace_period",
+        "resync_interval",
+        "debounce"
+      ],
+      "properties": {
+        "grace_period": {
+          "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "description": "Time to wait before removing a rule after its container disappears (e.g., 8h).",
+          "format": "duration"
+        },
+        "resync_interval": {
+          "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "description": "Interval between full reconciliation passes (e.g., 5m).",
+          "format": "duration"
+        },
+        "debounce": {
+          "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "description": "Debounce window for Docker events; burst events produce one pass (e.g., 2s).",
+          "format": "duration"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Reconciliation loop timing settings."
+    },
+    "ServerConfig": {
+      "required": [
+        "listen",
+        "log_level",
+        "log_format",
+        "state_path",
+        "status_refresh",
+        "metrics",
+        "dry_run"
+      ],
+      "properties": {
+        "listen": {
+          "type": "string",
+          "description": "HTTP listen address for the status page (e.g., :5000)."
+        },
+        "log_level": {
+          "type": "string",
+          "description": "Log level: DEBUG, INFO, WARN, or ERROR."
+        },
+        "log_format": {
+          "type": "string",
+          "description": "Log output format: json or text."
+        },
+        "state_path": {
+          "type": "string",
+          "description": "File path for persistent state (JSON)."
+        },
+        "status_refresh": {
+          "type": "string",
+          "description": "Meta-refresh interval for the status page; 0 disables auto-refresh."
+        },
+        "metrics": {
+          "type": "boolean",
+          "description": "Enable the Prometheus /metrics endpoint."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Log actions without making any API changes."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Server and logging settings."
+    },
+    "TunnelConfig": {
+      "required": [
+        "name",
+        "external_id",
+        "cloudflared"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tunnel name used for Cloudflare tunnel resource (REQUIRED unless external_id is set)."
+        },
+        "external_id": {
+          "type": "string",
+          "description": "UUID of an externally-managed tunnel; skips cloudflared container lifecycle."
+        },
+        "cloudflared": {
+          "required": [
+            "container_name",
+            "image",
+            "network",
+            "metrics_port"
+          ],
+          "properties": {
+            "container_name": {
+              "type": "string",
+              "description": "Docker container name for the cloudflared process."
+            },
+            "image": {
+              "type": "string",
+              "description": "Docker image for cloudflared (e.g., cloudflare/cloudflared:latest)."
+            },
+            "network": {
+              "type": "string",
+              "description": "Docker network the cloudflared container joins."
+            },
+            "metrics_port": {
+              "type": "integer",
+              "description": "TCP port exposed by cloudflared for Prometheus metrics."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Cloudflared container configuration."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Tunnel and cloudflared container settings."
+    }
+  }
 }

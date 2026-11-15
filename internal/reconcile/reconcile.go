@@ -221,7 +221,7 @@ func (e *Engine) Run(ctx context.Context) Result {
 		"dns_created", res.DNSCreated,
 		"ingress_updated", res.IngressUpdated,
 		"dry_run", res.DryRun,
-		"duration_ms", float64(duration.Nanoseconds())/1e6,
+		"duration", duration,
 	)
 
 	return res

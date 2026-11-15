@@ -116,8 +116,8 @@ func (d *Daemon) Snapshot() Snapshot {
 // On cancellation, it waits for any in-progress pass to complete before returning.
 func (d *Daemon) Run(ctx context.Context) {
 	d.log.Info("daemon starting",
-		"debounce_ms", float64(d.cfg.Debounce.Microseconds())/1e3,
-		"resync_interval_ms", float64(d.cfg.ResyncInterval.Microseconds())/1e3,
+		"debounce", d.cfg.Debounce,
+		"resync_interval", d.cfg.ResyncInterval,
 	)
 
 	// Start Docker event stream
@@ -240,12 +240,12 @@ func (d *Daemon) runPass(ctx context.Context) {
 	if res.LastError != nil {
 		d.log.Warn("reconcile pass failed",
 			"error", res.LastError,
-			"duration_ms", float64(duration.Nanoseconds())/1e6,
-			"backoff_ms", float64(backoffFor(d.cfg, d.snap.PassCount).Microseconds())/1e3,
+			"duration", duration,
+			"backoff", backoffFor(d.cfg, d.snap.PassCount),
 		)
 		// Schedule retry with backoff
 		retryAfter := backoffFor(d.cfg, d.snap.PassCount)
-		d.log.Info("retrying in", "after_ms", float64(retryAfter.Microseconds())/1e3)
+		d.log.Info("retrying in", "after", retryAfter)
 		time.AfterFunc(retryAfter, func() {
 			d.Trigger()
 		})
@@ -257,7 +257,7 @@ func (d *Daemon) runPass(ctx context.Context) {
 			"expired", res.RulesExpired,
 			"dns_created", res.DNSCreated,
 			"ingress_updated", res.IngressUpdated,
-			"duration_ms", float64(duration.Nanoseconds())/1e6,
+			"duration", duration,
 		)
 	}
 }

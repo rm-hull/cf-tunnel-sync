@@ -29,8 +29,9 @@ func NewRulesCmd() *cobra.Command {
 
 			logLevel := logx.ParseLogLevel(cfg.Server.LogLevel)
 			log := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-				Level:     logLevel,
-				AddSource: true,
+				Level:       logLevel,
+				AddSource:   true,
+				ReplaceAttr: logx.ReplaceAttr,
 			}))
 
 			api, err := docker.New(cfg.Docker.Host, log)

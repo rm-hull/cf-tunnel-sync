@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/cf"
 	"github.com/rm-hull/cf-tunnel-sync/internal/config"
@@ -28,8 +27,9 @@ func NewReconcileCmd() *cobra.Command {
 
 			logLevel := logx.ParseLogLevel(cfg.Server.LogLevel)
 			log := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-				Level:     logLevel,
-				AddSource: true,
+				Level:       logLevel,
+				AddSource:   true,
+				ReplaceAttr: logx.ReplaceAttr,
 			}))
 
 			dockerAPI, err := docker.New(cfg.Docker.Host, log)
@@ -42,11 +42,6 @@ func NewReconcileCmd() *cobra.Command {
 				return err
 			}
 
-			grace, err := time.ParseDuration(cfg.Reconcile.GracePeriod)
-			if err != nil {
-				return fmt.Errorf("parse grace_period: %w", err)
-			}
-
 			eng := reconcile.New(
 				log,
 				dockerAPI,
@@ -54,7 +49,7 @@ func NewReconcileCmd() *cobra.Command {
 				cfg.Server.StatePath,
 				cfg.Tunnel.Name,
 				cfg.Labels.Prefixes,
-				grace,
+				cfg.Reconcile.GracePeriod,
 				reconcile.WithDryRun(dryRun || cfg.Server.DryRun),
 			)
 
