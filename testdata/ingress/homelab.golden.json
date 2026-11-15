@@ -1,0 +1,18 @@
+[
+  {
+    "hostname": "cors-proxy.destructuring-bind.org",
+    "service": "http://cors-proxy:8080"
+  },
+  {
+    "hostname": "vault.destructuring-bind.org",
+    "service": "http://vaultwarden:80"
+  },
+  {
+    "hostname": "whoami.destructuring-bind.org",
+    "service": "http://whoami:80"
+  },
+  {
+    "hostname": "",
+    "service": "http_status:404"
+  }
+]

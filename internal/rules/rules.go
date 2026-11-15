@@ -1,0 +1,248 @@
+package rules
+
+import (
+	"sort"
+	"strings"
+	"time"
+)
+
+// Rule represents a tunnel routing rule with lifecycle state.
+type Rule struct {
+	Hostname         string
+	Path             string
+	Service          string
+	NoTLSVerify      bool
+	OriginServerName string
+	ZoneName         string
+	ContainerName    string
+	SourcePrefix     string
+	SourceIndex      *int // nil for non-indexed rules
+
+	// Lifecycle fields
+	Status       string // "active", "pending", "expired"
+	FirstSeen    time.Time
+	LastSeen     time.Time
+	PendingSince *time.Time // nil when not pending
+	DeleteAfter  *time.Time // nil when not pending
+}
+
+// Key returns the deterministic rule key: lower(hostname) + "|" + path.
+func (r Rule) Key() string {
+	return strings.ToLower(r.Hostname) + "|" + r.Path
+}
+
+// State holds the persisted rule state.
+type State struct {
+	Version int             `json:"version"`
+	Tunnel  TunnelInfo      `json:"tunnel"`
+	Rules   map[string]Rule `json:"rules"`
+}
+
+// TunnelInfo stores tunnel identification.
+type TunnelInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// NewState creates a new empty state with the current version.
+func NewState() *State {
+	return &State{
+		Version: 1,
+		Rules:   make(map[string]Rule),
+	}
+}
+
+// Apply computes the new state and categorizes rules into active, pending, and expired.
+// It implements the lifecycle from §6.2:
+//
+//   - in desired, not in state → new active; firstSeen=now
+//   - in desired and state (pending) → back to active; clear pending fields
+//   - in state (active), not in desired → pending; pendingSince=now; deleteAfter=now+grace
+//   - pending and now >= deleteAfter → expired
+//   - in desired, fields changed → updated in place
+func Apply(state *State, desired map[string]Rule, now time.Time, grace time.Duration) (*State, map[string]Rule, map[string]Rule, map[string]Rule) {
+	if state == nil {
+		state = NewState()
+	}
+	if state.Rules == nil {
+		state.Rules = make(map[string]Rule)
+	}
+
+	active := make(map[string]Rule)
+	pending := make(map[string]Rule)
+	expired := make(map[string]Rule)
+
+	// Track which desired keys we've processed
+	processed := make(map[string]bool)
+
+	// Process existing state rules
+	for key, rule := range state.Rules {
+		if desiredRule, ok := desired[key]; ok {
+			// Rule is still desired
+			processed[key] = true
+
+			if rule.Status == "pending" {
+				// Pending rule reappeared → back to active
+				rule.Status = "active"
+				rule.PendingSince = nil
+				rule.DeleteAfter = nil
+				// Update fields from desired
+				rule.Hostname = desiredRule.Hostname
+				rule.Path = desiredRule.Path
+				rule.Service = desiredRule.Service
+				rule.NoTLSVerify = desiredRule.NoTLSVerify
+				rule.OriginServerName = desiredRule.OriginServerName
+				rule.ZoneName = desiredRule.ZoneName
+				rule.ContainerName = desiredRule.ContainerName
+				rule.LastSeen = now
+			} else {
+				// Active rule still desired → update fields
+				rule.Hostname = desiredRule.Hostname
+				rule.Path = desiredRule.Path
+				rule.Service = desiredRule.Service
+				rule.NoTLSVerify = desiredRule.NoTLSVerify
+				rule.OriginServerName = desiredRule.OriginServerName
+				rule.ZoneName = desiredRule.ZoneName
+				rule.ContainerName = desiredRule.ContainerName
+				rule.LastSeen = now
+			}
+
+			state.Rules[key] = rule
+			active[key] = rule
+		} else {
+			// Rule not in desired
+			if rule.Status == "pending" {
+				// Check if expired
+				if rule.DeleteAfter != nil && now.Compare(*rule.DeleteAfter) >= 0 {
+					// Expired
+					expired[key] = rule
+					delete(state.Rules, key)
+				} else {
+					// Still pending
+					pending[key] = rule
+				}
+			} else {
+				// Active → pending
+				pendingSince := now
+				deleteAfter := now.Add(grace)
+				rule.Status = "pending"
+				rule.PendingSince = &pendingSince
+				rule.DeleteAfter = &deleteAfter
+				state.Rules[key] = rule
+				pending[key] = rule
+			}
+		}
+	}
+
+	// Process new desired rules not in state
+	for key, desiredRule := range desired {
+		if !processed[key] {
+			// New rule
+			rule := desiredRule
+			rule.Status = "active"
+			rule.FirstSeen = now
+			rule.LastSeen = now
+			state.Rules[key] = rule
+			active[key] = rule
+		}
+	}
+
+	return state, active, pending, expired
+}
+
+// IngressEntry represents a single entry in the cloudflared ingress config.
+type IngressEntry struct {
+	Hostname      string         `json:"hostname"`
+	Path          string         `json:"path,omitempty"`
+	Service       string         `json:"service"`
+	OriginRequest *OriginRequest `json:"originRequest,omitempty"`
+}
+
+// OriginRequest holds optional origin request settings.
+type OriginRequest struct {
+	NoTLSVerify      bool   `json:"noTLSVerify,omitempty"`
+	OriginServerName string `json:"originServerName,omitempty"`
+}
+
+// RenderIngress produces the ordered ingress entries from active and pending rules.
+// Only active and pending rules are included; expired rules are excluded.
+//
+// Ordering (first match wins in cloudflared):
+// 1. Non-wildcard before wildcard
+// 2. Within a hostname, rules with path before without
+// 3. Longer path first
+// 4. Hostname ascending
+// 5. Service ascending
+//
+// Always ends with the catch-all {service: "http_status:404"}.
+func RenderIngress(rules map[string]Rule) []IngressEntry {
+	var entries []IngressEntry
+
+	for _, rule := range rules {
+		// Only include active and pending rules
+		if rule.Status != "active" && rule.Status != "pending" {
+			continue
+		}
+
+		entry := IngressEntry{
+			Hostname: rule.Hostname,
+			Path:     rule.Path,
+			Service:  rule.Service,
+		}
+
+		// Only include originRequest when needed
+		if rule.NoTLSVerify || rule.OriginServerName != "" {
+			entry.OriginRequest = &OriginRequest{
+				NoTLSVerify:      rule.NoTLSVerify,
+				OriginServerName: rule.OriginServerName,
+			}
+		}
+
+		entries = append(entries, entry)
+	}
+
+	// Sort entries
+	sort.SliceStable(entries, func(i, j int) bool {
+		a, b := entries[i], entries[j]
+
+		// Non-wildcard before wildcard
+		aWildcard := strings.HasPrefix(a.Hostname, "*.")
+		bWildcard := strings.HasPrefix(b.Hostname, "*.")
+		if aWildcard != bWildcard {
+			return !aWildcard
+		}
+
+		// Hostname ascending
+		if a.Hostname != b.Hostname {
+			return a.Hostname < b.Hostname
+		}
+
+		// Rules with path before without
+		aHasPath := a.Path != ""
+		bHasPath := b.Path != ""
+		if aHasPath != bHasPath {
+			return aHasPath
+		}
+
+		// Longer path first (when both have paths)
+		if aHasPath && bHasPath {
+			if len(a.Path) != len(b.Path) {
+				return len(a.Path) > len(b.Path)
+			}
+			// Same length: lexicographic
+			if a.Path != b.Path {
+				return a.Path < b.Path
+			}
+		}
+
+		// Service ascending
+		return a.Service < b.Service
+	})
+
+	// Append catch-all
+	entries = append(entries, IngressEntry{
+		Service: "http_status:404",
+	})
+
+	return entries
+}
