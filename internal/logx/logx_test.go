@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"log/slog"
-	"strings"
 	"testing"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/logx"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRingBufferKeepsLastNRecords(t *testing.T) {
@@ -26,28 +27,22 @@ func TestRingBufferKeepsLastNRecords(t *testing.T) {
 	}
 
 	records := ring.Records()
-	if len(records) != capacity {
-		t.Fatalf("expected %d records, got %d", capacity, len(records))
-	}
+	require.Len(t, records, capacity)
 
 	// Check that the oldest records were dropped
 	// The first record should be index 3 (0,1,2 were dropped)
 	var firstRecord map[string]any
-	if err := json.Unmarshal(records[0], &firstRecord); err != nil {
-		t.Fatalf("failed to unmarshal first record: %v", err)
-	}
-	if idx, ok := firstRecord["index"].(float64); !ok || int(idx) != 3 {
-		t.Errorf("first record index = %v, want 3", firstRecord["index"])
-	}
+	require.NoError(t, json.Unmarshal(records[0], &firstRecord))
+	idx, ok := firstRecord["index"].(float64)
+	require.True(t, ok)
+	assert.Equal(t, 3, int(idx))
 
 	// The last record should be index 7
 	var lastRecord map[string]any
-	if err := json.Unmarshal(records[len(records)-1], &lastRecord); err != nil {
-		t.Fatalf("failed to unmarshal last record: %v", err)
-	}
-	if idx, ok := lastRecord["index"].(float64); !ok || int(idx) != 7 {
-		t.Errorf("last record index = %v, want 7", lastRecord["index"])
-	}
+	require.NoError(t, json.Unmarshal(records[len(records)-1], &lastRecord))
+	idx, ok = lastRecord["index"].(float64)
+	require.True(t, ok)
+	assert.Equal(t, 7, int(idx))
 }
 
 func TestRingBufferRecordsContainsRequiredFields(t *testing.T) {
@@ -62,30 +57,20 @@ func TestRingBufferRecordsContainsRequiredFields(t *testing.T) {
 	logger.Info("hello", "component", "test", "key", "value")
 
 	records := ring.Records()
-	if len(records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(records))
-	}
+	require.Len(t, records, 1)
 
 	var record map[string]any
-	if err := json.Unmarshal(records[0], &record); err != nil {
-		t.Fatalf("failed to unmarshal record: %v", err)
-	}
+	require.NoError(t, json.Unmarshal(records[0], &record))
 
 	// Check required fields
 	requiredFields := []string{"time", "level", "msg"}
 	for _, field := range requiredFields {
-		if _, ok := record[field]; !ok {
-			t.Errorf("missing required field %q in record", field)
-		}
+		assert.Contains(t, record, field, "record should contain field %q", field)
 	}
 
 	// Check custom attributes
-	if record["component"] != "test" {
-		t.Errorf("component = %v, want 'test'", record["component"])
-	}
-	if record["key"] != "value" {
-		t.Errorf("key = %v, want 'value'", record["key"])
-	}
+	assert.Equal(t, "test", record["component"])
+	assert.Equal(t, "value", record["key"])
 }
 
 func TestRingBufferReturnsCopy(t *testing.T) {
@@ -103,12 +88,8 @@ func TestRingBufferReturnsCopy(t *testing.T) {
 	records2 := ring.Records()
 
 	// records1 should still have only 1 record
-	if len(records1) != 1 {
-		t.Errorf("records1 length = %d, want 1 (should be a copy)", len(records1))
-	}
-	if len(records2) != 2 {
-		t.Errorf("records2 length = %d, want 2", len(records2))
-	}
+	assert.Equal(t, 1, len(records1), "records1 should be a copy")
+	assert.Equal(t, 2, len(records2))
 }
 
 func TestNewJSONLogger(t *testing.T) {
@@ -117,18 +98,12 @@ func TestNewJSONLogger(t *testing.T) {
 	logger.Info("test message", "key", "value")
 
 	records := ring.Records()
-	if len(records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(records))
-	}
+	require.Len(t, records, 1)
 
 	var record map[string]any
-	if err := json.Unmarshal(records[0], &record); err != nil {
-		t.Fatalf("failed to unmarshal: %v", err)
-	}
+	require.NoError(t, json.Unmarshal(records[0], &record))
 
-	if record["msg"] != "test message" {
-		t.Errorf("msg = %v, want 'test message'", record["msg"])
-	}
+	assert.Equal(t, "test message", record["msg"])
 }
 
 func TestRingBufferWithAttributes(t *testing.T) {
@@ -146,31 +121,19 @@ func TestRingBufferWithAttributes(t *testing.T) {
 
 	// Verify the underlying handler received the attributes
 	output := buf.String()
-	if !strings.Contains(output, "cf-tunnel-sync") {
-		t.Errorf("underlying handler output missing 'cf-tunnel-sync': %s", output)
-	}
-	if !strings.Contains(output, "started") {
-		t.Errorf("underlying handler output missing 'started': %s", output)
-	}
+	assert.Contains(t, output, "cf-tunnel-sync")
+	assert.Contains(t, output, "started")
 
 	// Verify the ring buffer captured the record
 	records := ring.Records()
-	if len(records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(records))
-	}
+	require.Len(t, records, 1)
 
 	var record map[string]any
-	if err := json.Unmarshal(records[0], &record); err != nil {
-		t.Fatalf("failed to unmarshal: %v", err)
-	}
+	require.NoError(t, json.Unmarshal(records[0], &record))
 
-	if record["msg"] != "started" {
-		t.Errorf("msg = %v, want 'started'", record["msg"])
-	}
+	assert.Equal(t, "started", record["msg"])
 	// port is from the log call, so it should be in the record
-	if record["port"] != float64(5000) {
-		t.Errorf("port = %v, want 5000", record["port"])
-	}
+	assert.Equal(t, float64(5000), record["port"])
 }
 
 func TestRingBufferWithGroup(t *testing.T) {
@@ -188,31 +151,19 @@ func TestRingBufferWithGroup(t *testing.T) {
 
 	// Verify the underlying handler received the group
 	output := buf.String()
-	if !strings.Contains(output, "docker") {
-		t.Errorf("underlying handler output missing 'docker': %s", output)
-	}
-	if !strings.Contains(output, "connected") {
-		t.Errorf("underlying handler output missing 'connected': %s", output)
-	}
+	assert.Contains(t, output, "docker")
+	assert.Contains(t, output, "connected")
 
 	// Verify the ring buffer captured the record
 	records := ring.Records()
-	if len(records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(records))
-	}
+	require.Len(t, records, 1)
 
 	var record map[string]any
-	if err := json.Unmarshal(records[0], &record); err != nil {
-		t.Fatalf("failed to unmarshal: %v", err)
-	}
+	require.NoError(t, json.Unmarshal(records[0], &record))
 
-	if record["msg"] != "connected" {
-		t.Errorf("msg = %v, want 'connected'", record["msg"])
-	}
+	assert.Equal(t, "connected", record["msg"])
 	// host is from the log call, so it should be in the record
-	if record["host"] != "unix:///var/run/docker.sock" {
-		t.Errorf("host = %v, want 'unix:///var/run/docker.sock'", record["host"])
-	}
+	assert.Equal(t, "unix:///var/run/docker.sock", record["host"])
 }
 
 func TestRingBufferEmpty(t *testing.T) {
@@ -225,9 +176,7 @@ func TestRingBufferEmpty(t *testing.T) {
 	_ = slog.New(ring)
 
 	records := ring.Records()
-	if len(records) != 0 {
-		t.Errorf("expected 0 records, got %d", len(records))
-	}
+	assert.Empty(t, records)
 }
 
 func TestRingBufferLevelFiltering(t *testing.T) {
@@ -244,19 +193,11 @@ func TestRingBufferLevelFiltering(t *testing.T) {
 
 	records := ring.Records()
 	// Debug should be filtered out
-	if len(records) != 1 {
-		t.Errorf("expected 1 record (debug filtered), got %d", len(records))
-	}
+	require.Len(t, records, 1)
 
-	if len(records) > 0 {
-		var record map[string]any
-		if err := json.Unmarshal(records[0], &record); err != nil {
-			t.Fatalf("failed to unmarshal: %v", err)
-		}
-		if record["msg"] != "info message" {
-			t.Errorf("msg = %v, want 'info message'", record["msg"])
-		}
-	}
+	var record map[string]any
+	require.NoError(t, json.Unmarshal(records[0], &record))
+	assert.Equal(t, "info message", record["msg"])
 }
 
 func TestRingBufferJSONOutput(t *testing.T) {
@@ -272,7 +213,5 @@ func TestRingBufferJSONOutput(t *testing.T) {
 
 	// The underlying handler should also receive the record
 	output := buf.String()
-	if !strings.Contains(output, "test") {
-		t.Errorf("underlying handler output missing 'test': %s", output)
-	}
+	assert.Contains(t, output, "test")
 }

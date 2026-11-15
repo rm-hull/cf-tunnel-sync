@@ -8,77 +8,54 @@ import (
 	"testing"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
 )
 
 func TestSecretString(t *testing.T) {
 	secret := config.Secret("my-secret-token")
-	if got := secret.String(); got != config.SecretValue {
-		t.Errorf("String() = %q, want %q", got, config.SecretValue)
-	}
+	assert.Equal(t, config.SecretValue, secret.String())
 }
 
 func TestSecretGoString(t *testing.T) {
 	secret := config.Secret("my-secret-token")
-	if got := secret.GoString(); got != config.SecretValue {
-		t.Errorf("GoString() = %q, want %q", got, config.SecretValue)
-	}
+	assert.Equal(t, config.SecretValue, secret.GoString())
 }
 
 func TestSecretLogValue(t *testing.T) {
 	secret := config.Secret("my-secret-token")
 	val := secret.LogValue()
-	if got := val.Any(); fmt.Sprintf("%v", got) != config.SecretValue {
-		t.Errorf("LogValue() = %v, want %q", got, config.SecretValue)
-	}
+	assert.Equal(t, config.SecretValue, fmt.Sprintf("%v", val.Any()))
 }
 
 func TestSecretMarshalJSON(t *testing.T) {
 	secret := config.Secret("my-secret-token")
 	data, err := json.Marshal(secret)
-	if err != nil {
-		t.Fatalf("MarshalJSON failed: %v", err)
-	}
-	if got := string(data); got != `"[redacted]"` {
-		t.Errorf("MarshalJSON() = %s, want %q", got, `"[redacted]"`)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, `"[redacted]"`, string(data))
 }
 
 func TestSecretMarshalYAML(t *testing.T) {
 	secret := config.Secret("my-secret-token")
 	data, err := yaml.Marshal(secret)
-	if err != nil {
-		t.Fatalf("MarshalYAML failed: %v", err)
-	}
+	require.NoError(t, err)
 	// YAML marshals strings with quotes, so we expect '[redacted]'
-	got := strings.TrimSpace(string(data))
-	if got != "'[redacted]'" {
-		t.Errorf("MarshalYAML() = %q, want %q", got, "'[redacted]'")
-	}
+	assert.Equal(t, "'[redacted]'", strings.TrimSpace(string(data)))
 }
 
 func TestSecretUnmarshalJSON(t *testing.T) {
 	var secret config.Secret
-	if err := json.Unmarshal([]byte(`"test-token"`), &secret); err != nil {
-		t.Fatalf("UnmarshalJSON failed: %v", err)
-	}
-	if string(secret) != "test-token" {
-		t.Errorf("UnmarshalJSON: underlying value = %q, want %q", string(secret), "test-token")
-	}
+	require.NoError(t, json.Unmarshal([]byte(`"test-token"`), &secret))
+	assert.Equal(t, "test-token", string(secret))
 	// But String() should still redact
-	if secret.String() != config.SecretValue {
-		t.Errorf("String() after unmarshal = %q, want %q", secret.String(), config.SecretValue)
-	}
+	assert.Equal(t, config.SecretValue, secret.String())
 }
 
 func TestSecretUnmarshalYAML(t *testing.T) {
 	var secret config.Secret
-	if err := yaml.Unmarshal([]byte("test-token"), &secret); err != nil {
-		t.Fatalf("UnmarshalYAML failed: %v", err)
-	}
-	if string(secret) != "test-token" {
-		t.Errorf("UnmarshalYAML: underlying value = %q, want %q", string(secret), "test-token")
-	}
+	require.NoError(t, yaml.Unmarshal([]byte("test-token"), &secret))
+	assert.Equal(t, "test-token", string(secret))
 }
 
 func TestSecretInStructJSON(t *testing.T) {
@@ -89,16 +66,10 @@ func TestSecretInStructJSON(t *testing.T) {
 
 	cfg := Config{Name: "test", Token: config.Secret("secret123")}
 	data, err := json.Marshal(cfg)
-	if err != nil {
-		t.Fatalf("Marshal failed: %v", err)
-	}
+	require.NoError(t, err)
 
-	if strings.Contains(string(data), "secret123") {
-		t.Errorf("secret value leaked in JSON: %s", string(data))
-	}
-	if !strings.Contains(string(data), "[redacted]") {
-		t.Errorf("redacted marker missing in JSON: %s", string(data))
-	}
+	assert.NotContains(t, string(data), "secret123")
+	assert.Contains(t, string(data), "[redacted]")
 }
 
 func TestSecretInStructYAML(t *testing.T) {
@@ -109,16 +80,10 @@ func TestSecretInStructYAML(t *testing.T) {
 
 	cfg := Config{Name: "test", Token: config.Secret("secret123")}
 	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		t.Fatalf("Marshal failed: %v", err)
-	}
+	require.NoError(t, err)
 
-	if strings.Contains(string(data), "secret123") {
-		t.Errorf("secret value leaked in YAML: %s", string(data))
-	}
-	if !strings.Contains(string(data), "[redacted]") {
-		t.Errorf("redacted marker missing in YAML: %s", string(data))
-	}
+	assert.NotContains(t, string(data), "secret123")
+	assert.Contains(t, string(data), "[redacted]")
 }
 
 func TestSecretInSlog(t *testing.T) {
@@ -133,12 +98,8 @@ func TestSecretInSlog(t *testing.T) {
 	logger.Info("test", "token", secret)
 	output := buf.String()
 
-	if strings.Contains(output, "my-secret-token") {
-		t.Errorf("secret value leaked in slog output: %s", output)
-	}
-	if !strings.Contains(output, "[redacted]") {
-		t.Errorf("redacted marker missing in slog output: %s", output)
-	}
+	assert.NotContains(t, output, "my-secret-token")
+	assert.Contains(t, output, "[redacted]")
 }
 
 func TestSecretWithPrintf(t *testing.T) {
@@ -146,19 +107,13 @@ func TestSecretWithPrintf(t *testing.T) {
 
 	// Test %v
 	outV := fmt.Sprintf("%v", secret)
-	if strings.Contains(outV, "my-secret-token") {
-		t.Errorf("%%v leaked secret: %s", outV)
-	}
+	assert.NotContains(t, outV, "my-secret-token")
 
 	// Test %+v
 	outPlusV := fmt.Sprintf("%+v", secret)
-	if strings.Contains(outPlusV, "my-secret-token") {
-		t.Errorf("%%+v leaked secret: %s", outPlusV)
-	}
+	assert.NotContains(t, outPlusV, "my-secret-token")
 
 	// Test %#v
 	outHashV := fmt.Sprintf("%#v", secret)
-	if strings.Contains(outHashV, "my-secret-token") {
-		t.Errorf("%%#v leaked secret: %s", outHashV)
-	}
+	assert.NotContains(t, outHashV, "my-secret-token")
 }

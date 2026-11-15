@@ -2,10 +2,11 @@ package cli_test
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/cli"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVersionCommand(t *testing.T) {
@@ -17,18 +18,11 @@ func TestVersionCommand(t *testing.T) {
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("version command failed: %v", err)
-	}
+	require.NoError(t, cmd.Execute())
 
 	output := out.String()
-	if !strings.Contains(output, "cf-tunnel-sync") {
-		t.Errorf("version output missing 'cf-tunnel-sync': %s", output)
-	}
-	if !strings.Contains(output, "commit:") {
-		t.Errorf("version output missing 'commit:': %s", output)
-	}
+	assert.Contains(t, output, "cf-tunnel-sync")
+	assert.Contains(t, output, "commit:")
 }
 
 func TestUnknownSubcommand(t *testing.T) {
@@ -40,9 +34,7 @@ func TestUnknownSubcommand(t *testing.T) {
 	cmd.SetErr(&buf)
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for unknown subcommand")
-	}
+	require.Error(t, err, "expected error for unknown subcommand")
 }
 
 func TestHelpListsSubcommands(t *testing.T) {
@@ -59,9 +51,7 @@ func TestHelpListsSubcommands(t *testing.T) {
 	out := buf.String()
 	expectedCommands := []string{"run", "reconcile", "plan", "rules", "config", "healthcheck"}
 	for _, sub := range expectedCommands {
-		if !strings.Contains(out, sub) {
-			t.Errorf("help output missing subcommand '%s': %s", sub, out)
-		}
+		assert.Contains(t, out, sub, "help output should contain subcommand '%s'", sub)
 	}
 }
 
@@ -70,15 +60,11 @@ func TestConfigSubcommands(t *testing.T) {
 
 	// Check that config subcommands exist
 	configCmd, _, err := cmd.Find([]string{"config"})
-	if err != nil {
-		t.Fatalf("config command not found: %v", err)
-	}
+	require.NoError(t, err, "config command not found")
 
 	expectedSubs := []string{"print", "validate", "schema"}
 	for _, sub := range expectedSubs {
 		_, _, err := configCmd.Find([]string{sub})
-		if err != nil {
-			t.Errorf("config subcommand '%s' not found: %v", sub, err)
-		}
+		assert.NoError(t, err, "config subcommand '%s' not found", sub)
 	}
 }
