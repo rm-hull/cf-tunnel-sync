@@ -12,6 +12,11 @@ import (
 // fakeAPI is an in-memory implementation of API for testing.
 type fakeAPI struct {
 	containers map[string]Container // keyed by ID
+
+	// Action tracking for EnsureCloudflared tests
+	CreatedContainers []string // names of containers created
+	StartedContainers []string // IDs of containers started
+	PulledImages      []string // images pulled
 }
 
 // NewFake creates a fake Docker API with the given containers.
@@ -118,13 +123,15 @@ func (a *fakeAPI) InspectContainer(_ context.Context, id string) (Container, err
 	return c, nil
 }
 
-func (a *fakeAPI) CreateContainer(_ context.Context, name, image string, _ []string, _ []string, _ string) (string, error) {
+func (a *fakeAPI) CreateContainer(_ context.Context, name, image string, _ []string, _ []string, network string) (string, error) {
 	id := "new-" + name
 	a.containers[id] = Container{
-		ID:    id,
-		Name:  name,
-		Image: image,
+		ID:      id,
+		Name:    name,
+		Image:   image,
+		Network: network,
 	}
+	a.CreatedContainers = append(a.CreatedContainers, name)
 	return id, nil
 }
 
@@ -133,6 +140,7 @@ func (a *fakeAPI) StartContainer(_ context.Context, id string) error {
 		c.State = "running"
 		a.containers[id] = c
 	}
+	a.StartedContainers = append(a.StartedContainers, id)
 	return nil
 }
 
@@ -149,8 +157,18 @@ func (a *fakeAPI) RemoveContainer(_ context.Context, id string) error {
 	return nil
 }
 
-func (a *fakeAPI) PullImage(_ context.Context, _ string, _ io.Writer) error {
+func (a *fakeAPI) PullImage(_ context.Context, image string, _ io.Writer) error {
+	a.PulledImages = append(a.PulledImages, image)
 	return nil
+}
+
+func (a *fakeAPI) FindContainerByName(_ context.Context, name string) (Container, error) {
+	for _, c := range a.containers {
+		if c.Name == name {
+			return c, nil
+		}
+	}
+	return Container{}, nil
 }
 
 func splitLabelFilter(filter string) [2]string {

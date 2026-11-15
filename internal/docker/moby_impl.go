@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	mobycontainer "github.com/moby/moby/api/types/container"
+	mobynetwork "github.com/moby/moby/api/types/network"
 	mobyclient "github.com/moby/moby/client"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/labels"
@@ -219,15 +220,29 @@ func (a *mobyAPI) InspectContainer(ctx context.Context, id string) (Container, e
 	return c, nil
 }
 
-func (a *mobyAPI) CreateContainer(ctx context.Context, name, image string, cmd []string, env []string, _ string) (string, error) {
-	a.log.Debug("creating container", "name", name, "image", image)
+func (a *mobyAPI) CreateContainer(ctx context.Context, name, image string, cmd []string, env []string, network string) (string, error) {
+	a.log.Debug("creating container", "name", name, "image", image, "network", network)
+
+	networkingConfig := &mobynetwork.NetworkingConfig{
+		EndpointsConfig: map[string]*mobynetwork.EndpointSettings{
+			network: {},
+		},
+	}
+
 	result, err := a.client.ContainerCreate(ctx, mobyclient.ContainerCreateOptions{
 		Name:  name,
 		Image: image,
 		Config: &mobycontainer.Config{
-			Cmd: cmd,
-			Env: env,
+			Cmd:   cmd,
+			Env:   env,
+			Image: image,
 		},
+		HostConfig: &mobycontainer.HostConfig{
+			RestartPolicy: mobycontainer.RestartPolicy{
+				Name: mobycontainer.RestartPolicyUnlessStopped,
+			},
+		},
+		NetworkingConfig: networkingConfig,
 	})
 	if err != nil {
 		a.log.Debug("create container failed", "name", name, "error", err)
@@ -285,4 +300,36 @@ func (a *mobyAPI) PullImage(ctx context.Context, image string, stdout io.Writer)
 	}
 	a.log.Debug("image pulled", "image", image)
 	return nil
+}
+
+func (a *mobyAPI) FindContainerByName(ctx context.Context, name string) (Container, error) {
+	a.log.Debug("finding container by name", "name", name)
+	result, err := a.client.ContainerList(ctx, mobyclient.ContainerListOptions{
+		Filters: mobyclient.Filters{}.Add("name", "^/"+name+"$"),
+	})
+	if err != nil {
+		a.log.Debug("find container by name failed", "name", name, "error", err)
+		return Container{}, fmt.Errorf("find container by name: %w", err)
+	}
+	if len(result.Items) == 0 {
+		a.log.Debug("container not found", "name", name)
+		return Container{}, nil
+	}
+	s := result.Items[0]
+	containerName := strings.TrimPrefix(s.Names[0], "/")
+	net := ""
+	if s.NetworkSettings != nil && s.NetworkSettings.Networks != nil {
+		for n := range s.NetworkSettings.Networks {
+			net = n
+			break
+		}
+	}
+	return Container{
+		ID:      s.ID,
+		Name:    containerName,
+		Image:   s.Image,
+		Labels:  s.Labels,
+		State:   string(s.State),
+		Network: net,
+	}, nil
 }

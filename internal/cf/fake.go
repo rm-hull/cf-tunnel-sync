@@ -15,6 +15,7 @@ type Fake struct {
 	DNSRecords  map[string][]DNSRecord   // zoneID -> records
 	Ingress     map[string]IngressConfig // tunnelID -> config
 	Connections map[string]int           // tunnelID -> count
+	Tokens      map[string]string        // tunnelID -> token
 
 	// Track calls for verification
 	TunnelLookups   int
@@ -34,6 +35,7 @@ func NewFake() *Fake {
 		DNSRecords:  make(map[string][]DNSRecord),
 		Ingress:     make(map[string]IngressConfig),
 		Connections: make(map[string]int),
+		Tokens:      make(map[string]string),
 		stats: Stats{
 			ByResource: make(map[string]int),
 		},
@@ -63,6 +65,11 @@ func (f *Fake) SetIngress(tunnelID string, cfg IngressConfig) {
 // SetConnections sets the connection count for a tunnel.
 func (f *Fake) SetConnections(tunnelID string, count int) {
 	f.Connections[tunnelID] = count
+}
+
+// SetToken sets the tunnel token for a tunnel.
+func (f *Fake) SetToken(tunnelID, token string) {
+	f.Tokens[tunnelID] = token
 }
 
 // FindTunnel finds a tunnel by name.
@@ -114,6 +121,18 @@ func (f *Fake) GetConnections(_ context.Context, tunnelID string) (int, error) {
 		return 0, nil
 	}
 	return count, nil
+}
+
+// GetTunnelToken returns the tunnel token for a tunnel.
+func (f *Fake) GetTunnelToken(_ context.Context, tunnelID string) (string, error) {
+	f.stats.Calls++
+	f.stats.ByResource["tunnels"]++
+
+	token, ok := f.Tokens[tunnelID]
+	if !ok {
+		return "", ErrNotFound
+	}
+	return token, nil
 }
 
 // ListZones returns all zones.

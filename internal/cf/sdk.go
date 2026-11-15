@@ -63,6 +63,12 @@ func (s *sdkAPI) GetConnections(_ context.Context, _ string) (int, error) {
 	return 0, ErrReadOnly
 }
 
+// GetTunnelToken returns the tunnel token for running cloudflared.
+func (s *sdkAPI) GetTunnelToken(_ context.Context, _ string) (string, error) {
+	s.inc("tunnels")
+	return "", ErrReadOnly
+}
+
 // ListZones returns all zones for the account.
 func (s *sdkAPI) ListZones(_ context.Context) ([]Zone, error) {
 	s.inc("zones")

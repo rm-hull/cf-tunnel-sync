@@ -11,11 +11,12 @@ import (
 
 // Container represents a Docker container relevant to tunnel management.
 type Container struct {
-	ID     string
-	Name   string
-	Image  string
-	Labels map[string]string
-	State  string // "running", "exited", "created", etc.
+	ID      string
+	Name    string
+	Image   string
+	Labels  map[string]string
+	State   string // "running", "exited", "created", etc.
+	Network string // primary network attached
 }
 
 // Event represents a Docker event of interest.
@@ -63,4 +64,7 @@ type API interface {
 
 	// PullImage pulls a Docker image.
 	PullImage(ctx context.Context, image string, stdout io.Writer) error
+
+	// FindContainerByName returns a container by name, or empty if not found.
+	FindContainerByName(ctx context.Context, name string) (Container, error)
 }

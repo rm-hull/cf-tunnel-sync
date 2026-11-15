@@ -92,6 +92,9 @@ type API interface {
 	// GetConnections returns the number of active connections for a tunnel.
 	GetConnections(ctx context.Context, tunnelID string) (int, error)
 
+	// GetTunnelToken returns the tunnel token/secret for running cloudflared.
+	GetTunnelToken(ctx context.Context, tunnelID string) (string, error)
+
 	// ListZones returns all zones for the account.
 	ListZones(ctx context.Context) ([]Zone, error)
 
