@@ -8,22 +8,22 @@ import (
 
 // Rule represents a tunnel routing rule with lifecycle state.
 type Rule struct {
-	Hostname         string
-	Path             string
-	Service          string
-	NoTLSVerify      bool
-	OriginServerName string
-	ZoneName         string
-	ContainerName    string
-	SourcePrefix     string
-	SourceIndex      *int // nil for non-indexed rules
+	Hostname         string `json:"hostname"`
+	Path             string `json:"path"`
+	Service          string `json:"service"`
+	NoTLSVerify      bool   `json:"noTLSVerify"`
+	OriginServerName string `json:"originServerName"`
+	ZoneName         string `json:"zoneName"`
+	ContainerName    string `json:"containerName"`
+	SourcePrefix     string `json:"sourcePrefix"`
+	SourceIndex      *int   `json:"sourceIndex"` // nil for non-indexed rules
 
 	// Lifecycle fields
-	Status       string // "active", "pending", "expired"
-	FirstSeen    time.Time
-	LastSeen     time.Time
-	PendingSince *time.Time // nil when not pending
-	DeleteAfter  *time.Time // nil when not pending
+	Status       string     `json:"status"` // "active", "pending", "expired"
+	FirstSeen    time.Time  `json:"firstSeen"`
+	LastSeen     time.Time  `json:"lastSeen"`
+	PendingSince *time.Time `json:"pendingSince"` // nil when not pending
+	DeleteAfter  *time.Time `json:"deleteAfter"`  // nil when not pending
 }
 
 // Key returns the deterministic rule key: lower(hostname) + "|" + path.
