@@ -31,6 +31,54 @@ func (r Rule) Key() string {
 	return strings.ToLower(r.Hostname) + "|" + r.Path
 }
 
+// IsExpired returns true if the rule has a DeleteAfter time and now has passed it.
+func (r Rule) IsExpired(now time.Time) bool {
+	return r.DeleteAfter != nil && now.Compare(*r.DeleteAfter) >= 0
+}
+
+// applyDesired updates the rule's fields from the desired rule and sets LastSeen.
+// If the rule was pending, it transitions back to active.
+func (r Rule) applyDesired(desired Rule, now time.Time) Rule {
+	if r.Status == "pending" {
+		r.Status = "active"
+		r.PendingSince = nil
+		r.DeleteAfter = nil
+	}
+	r.Hostname = desired.Hostname
+	r.Path = desired.Path
+	r.Service = desired.Service
+	r.NoTLSVerify = desired.NoTLSVerify
+	r.OriginServerName = desired.OriginServerName
+	r.ZoneName = desired.ZoneName
+	r.ContainerName = desired.ContainerName
+	r.SourcePrefix = desired.SourcePrefix
+	r.SourceIndex = desired.SourceIndex
+	r.LastSeen = now
+	return r
+}
+
+// transitionNotDesired handles the lifecycle transition when a rule is no longer desired.
+// It returns the (possibly updated) rule and a transition string:
+//   - "expired" if the rule should be removed
+//   - "pending" if it newly transitioned to pending (needs persist)
+//   - "keep" if it's still pending but not yet expired (no state change needed)
+func (r Rule) transitionNotDesired(now time.Time, grace time.Duration) (Rule, string) {
+	if r.Status == "pending" {
+		if r.IsExpired(now) {
+			return r, "expired"
+		}
+		// Still pending, not expired — keep as is
+		return r, "keep"
+	}
+	// Active → pending transition
+	r.Status = "pending"
+	pendingSince := now
+	deleteAfter := now.Add(grace)
+	r.PendingSince = &pendingSince
+	r.DeleteAfter = &deleteAfter
+	return r, "pending"
+}
+
 // State holds the persisted rule state.
 type State struct {
 	Version int             `json:"version"`
@@ -77,60 +125,28 @@ func Apply(state *State, desired map[string]Rule, now time.Time, grace time.Dura
 
 	// Process existing state rules
 	for key, rule := range state.Rules {
-		if desiredRule, ok := desired[key]; ok {
-			// Rule is still desired
+		desiredRule, isDesired := desired[key]
+
+		if isDesired {
 			processed[key] = true
-
-			if rule.Status == "pending" {
-				// Pending rule reappeared → back to active
-				rule.Status = "active"
-				rule.PendingSince = nil
-				rule.DeleteAfter = nil
-				// Update fields from desired
-				rule.Hostname = desiredRule.Hostname
-				rule.Path = desiredRule.Path
-				rule.Service = desiredRule.Service
-				rule.NoTLSVerify = desiredRule.NoTLSVerify
-				rule.OriginServerName = desiredRule.OriginServerName
-				rule.ZoneName = desiredRule.ZoneName
-				rule.ContainerName = desiredRule.ContainerName
-				rule.LastSeen = now
-			} else {
-				// Active rule still desired → update fields
-				rule.Hostname = desiredRule.Hostname
-				rule.Path = desiredRule.Path
-				rule.Service = desiredRule.Service
-				rule.NoTLSVerify = desiredRule.NoTLSVerify
-				rule.OriginServerName = desiredRule.OriginServerName
-				rule.ZoneName = desiredRule.ZoneName
-				rule.ContainerName = desiredRule.ContainerName
-				rule.LastSeen = now
-			}
-
+			rule = rule.applyDesired(desiredRule, now)
 			state.Rules[key] = rule
 			active[key] = rule
-		} else {
-			// Rule not in desired
-			if rule.Status == "pending" {
-				// Check if expired
-				if rule.DeleteAfter != nil && now.Compare(*rule.DeleteAfter) >= 0 {
-					// Expired
-					expired[key] = rule
-					delete(state.Rules, key)
-				} else {
-					// Still pending
-					pending[key] = rule
-				}
-			} else {
-				// Active → pending
-				pendingSince := now
-				deleteAfter := now.Add(grace)
-				rule.Status = "pending"
-				rule.PendingSince = &pendingSince
-				rule.DeleteAfter = &deleteAfter
-				state.Rules[key] = rule
-				pending[key] = rule
-			}
+			continue
+		}
+
+		// Rule not in desired — handle lifecycle transition
+		rule, transition := rule.transitionNotDesired(now, grace)
+		switch transition {
+		case "expired":
+			expired[key] = rule
+			delete(state.Rules, key)
+		case "pending":
+			pending[key] = rule
+			state.Rules[key] = rule
+		case "keep":
+			// Still pending (not expired) — keep in pending map, no state change
+			pending[key] = rule
 		}
 	}
 
