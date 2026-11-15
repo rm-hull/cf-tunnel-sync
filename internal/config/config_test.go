@@ -469,6 +469,6 @@ func TestExampleConfig(t *testing.T) {
 
 	cfg, err := config.Load("../../config.example.yaml")
 	require.NoError(t, err)
-	assert.Equal(t, "homelab", cfg.Tunnel.Name)
+	assert.Equal(t, "test-tunnel", cfg.Tunnel.Name)
 	assert.Equal(t, "test-token", string(cfg.Cloudflare.APIToken))
 }

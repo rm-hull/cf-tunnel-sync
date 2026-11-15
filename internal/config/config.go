@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -191,6 +192,11 @@ func Load(flagPath string) (*Config, error) {
 	cfg := Defaults()
 
 	if path != "" {
+		// Load .env file from the same directory as the config
+		if err := loadEnvFile(filepath.Dir(path)); err != nil {
+			return nil, err
+		}
+
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("read config %s: %w", path, err)
@@ -424,9 +430,9 @@ func expandEnv(s, keyPath string) (string, error) {
 		inner := match[2 : len(match)-1] // Strip ${ and }
 
 		// Check for default value
-		if idx := strings.Index(inner, ":-"); idx >= 0 {
-			varName := inner[:idx]
-			defaultValue := inner[idx+2:]
+		if before, after, ok := strings.Cut(inner, ":-"); ok {
+			varName := before
+			defaultValue := after
 			if val, ok := os.LookupEnv(varName); ok {
 				return val
 			}
@@ -480,6 +486,30 @@ func applyEnvOverrides(cfg *Config) error {
 
 	if val := os.Getenv("DOCKER_HOST"); val != "" {
 		cfg.Docker.Host = val
+	}
+
+	return nil
+}
+
+// loadEnvFile reads a .env file from the given directory and sets the
+// key-value pairs as environment variables. Only sets a variable if it is
+// not already set, so explicit env vars always take precedence.
+// A missing .env file is silently ignored.
+func loadEnvFile(dir string) error {
+	env, err := godotenv.Read(filepath.Join(dir, ".env"))
+	if err != nil {
+		// Missing .env is fine; godotenv returns os.ErrNotExist when the file is absent
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read .env: %w", err)
+	}
+
+	for key, value := range env {
+		// Only set if not already present
+		if _, exists := os.LookupEnv(key); !exists {
+			os.Setenv(key, value)
+		}
 	}
 
 	return nil
