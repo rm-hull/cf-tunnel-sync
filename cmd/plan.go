@@ -7,11 +7,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/rm-hull/cf-tunnel-sync/internal"
 	"github.com/rm-hull/cf-tunnel-sync/internal/cf"
 	"github.com/rm-hull/cf-tunnel-sync/internal/config"
 	"github.com/rm-hull/cf-tunnel-sync/internal/docker"
 	"github.com/rm-hull/cf-tunnel-sync/internal/labels"
+	"github.com/rm-hull/cf-tunnel-sync/internal/logx"
 	rulespkg "github.com/rm-hull/cf-tunnel-sync/internal/rules"
 	"github.com/spf13/cobra"
 )
@@ -27,9 +27,10 @@ func NewPlanCmd() *cobra.Command {
 				return err
 			}
 
-			logLevel := internal.ParseLogLevel(cfg.Server.LogLevel)
+			logLevel := logx.ParseLogLevel(cfg.Server.LogLevel)
 			log := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-				Level: logLevel,
+				Level:     logLevel,
+				AddSource: true,
 			}))
 
 			dockerAPI, err := docker.New(cfg.Docker.Host, log)

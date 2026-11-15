@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rm-hull/cf-tunnel-sync/internal"
 	"github.com/rm-hull/cf-tunnel-sync/internal/cf"
 	"github.com/rm-hull/cf-tunnel-sync/internal/config"
 	"github.com/rm-hull/cf-tunnel-sync/internal/docker"
@@ -29,7 +28,7 @@ func NewRunCmd() *cobra.Command {
 				return err
 			}
 
-			logLevel := internal.ParseLogLevel(cfg.Server.LogLevel)
+			logLevel := logx.ParseLogLevel(cfg.Server.LogLevel)
 			log, ring := logx.NewJSONLogger(logLevel, 1000)
 			_ = ring // will be used by S10 web status page
 
@@ -112,9 +111,9 @@ func NewRunCmd() *cobra.Command {
 
 			log.Info("starting daemon",
 				"tunnel", cfg.Tunnel.Name,
-				"debounce", debounce,
-				"resync_interval", resyncInterval,
-				"grace_period", grace,
+				"debounce_ms", float64(debounce.Microseconds())/1e3,
+				"resync_interval_ms", float64(resyncInterval.Microseconds())/1e3,
+				"grace_period_ms", float64(grace.Microseconds())/1e3,
 				"dry_run", dryRun || cfg.Server.DryRun,
 			)
 

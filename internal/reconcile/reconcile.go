@@ -125,9 +125,7 @@ func (e *Engine) Run(ctx context.Context) Result {
 		Network:       e.cloudflaredCfg.Network,
 		MetricsPort:   e.cloudflaredCfg.MetricsPort,
 	}
-	if cfErr := docker.EnsureCloudflared(ctx, e.dockerAPI, e.cfAPI, tunnel.ID,
-		cfCfg, e.externalTunnelID, e.dryRun, e.log,
-	); cfErr != nil {
+	if cfErr := docker.EnsureCloudflared(ctx, e.dockerAPI, e.cfAPI, tunnel.ID, cfCfg, e.externalTunnelID, e.dryRun, e.log); cfErr != nil {
 		e.log.Error("ensure cloudflared", "error", cfErr)
 		// Don't abort the pass; continue with ingress/DNS reconciliation
 	}
@@ -211,6 +209,9 @@ func (e *Engine) Run(ctx context.Context) Result {
 		return res
 	}
 
+	duration := time.Since(start)
+	res.Duration = duration
+
 	// 10. Log summary
 	e.log.Info("reconcile done",
 		"added", res.RulesAdded,
@@ -220,7 +221,7 @@ func (e *Engine) Run(ctx context.Context) Result {
 		"dns_created", res.DNSCreated,
 		"ingress_updated", res.IngressUpdated,
 		"dry_run", res.DryRun,
-		"dur_ms", res.Duration.Milliseconds(),
+		"duration_ms", float64(duration.Nanoseconds())/1e6,
 	)
 
 	return res

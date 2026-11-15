@@ -97,12 +97,28 @@ func (h *RingBufferHandler) Records() []json.RawMessage {
 }
 
 // NewJSONLogger creates a new slog.Logger with JSON output to stdout and a ring buffer.
+// Call site information (file, line, function) is included in every log entry.
 func NewJSONLogger(level slog.Level, ringCapacity int) (*slog.Logger, *RingBufferHandler) {
 	jsonHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: level,
+		Level:     level,
+		AddSource: true,
 	})
 
 	ring := NewRingBufferHandler(ringCapacity, jsonHandler)
 	logger := slog.New(ring)
 	return logger, ring
+}
+
+// ParseLogLevel converts a config log level string to slog.Level.
+func ParseLogLevel(level string) slog.Level {
+	switch level {
+	case "DEBUG":
+		return slog.LevelDebug
+	case "WARN":
+		return slog.LevelWarn
+	case "ERROR":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
