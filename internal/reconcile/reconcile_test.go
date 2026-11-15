@@ -222,7 +222,7 @@ func TestReconcile_dns_delete_refused_wrong_target(t *testing.T) {
 	st.Tunnel = rules.TunnelInfo{ID: "tunnel-uuid", Name: "homelab"}
 	expiredTime := time.Now().Add(-time.Hour)
 	deleteAfter := time.Now().Add(-time.Minute)
-	st.Rules["whoami.example.com|"] = rules.Rule{
+	st.Rules["whoami.example.com"] = rules.Rule{
 		Hostname: "whoami.example.com", Service: "http://whoami:80", Status: "pending",
 		FirstSeen: expiredTime, LastSeen: expiredTime,
 		DeleteAfter: &deleteAfter, PendingSince: &expiredTime,
@@ -382,7 +382,7 @@ func TestReconcile_state_persisted(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	assert.Contains(t, st.Rules, "whoami.example.com|")
+	assert.Contains(t, st.Rules, "whoami.example.com")
 	assert.Equal(t, "tunnel-uuid", st.Tunnel.ID)
 }
 
@@ -401,7 +401,7 @@ func TestReconcile_expired_rules_cleaned(t *testing.T) {
 	st.Tunnel = rules.TunnelInfo{ID: "tunnel-uuid", Name: "homelab"}
 	expiredTime := time.Now().Add(-time.Hour)
 	deleteAfter := time.Now().Add(-time.Minute)
-	st.Rules["whoami.example.com|"] = rules.Rule{
+	st.Rules["whoami.example.com"] = rules.Rule{
 		Hostname: "whoami.example.com", Service: "http://whoami:80", Status: "pending",
 		FirstSeen: expiredTime, LastSeen: expiredTime,
 		DeleteAfter: &deleteAfter, PendingSince: &expiredTime,
@@ -420,7 +420,7 @@ func TestReconcile_expired_rules_cleaned(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	assert.NotContains(t, st.Rules, "whoami.example.com|")
+	assert.NotContains(t, st.Rules, "whoami.example.com")
 }
 
 func TestReconcile_pending_in_ingress(t *testing.T) {
@@ -818,7 +818,7 @@ func TestReconcile_restart_from_state(t *testing.T) {
 	st := rules.NewState()
 	st.Tunnel = rules.TunnelInfo{ID: "tunnel-uuid", Name: "homelab"}
 	now := time.Now()
-	st.Rules["whoami.example.com|"] = rules.Rule{
+	st.Rules["whoami.example.com"] = rules.Rule{
 		Hostname: "whoami.example.com", Service: "http://whoami:80", Status: "active",
 		FirstSeen: now, LastSeen: now, ContainerName: "whoami",
 	}
@@ -1018,7 +1018,7 @@ func TestReconcile_back_to_active(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "active", rule.Status)
 	assert.Nil(t, rule.PendingSince)
@@ -1054,7 +1054,7 @@ func TestReconcile_field_change(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "http://app:8080", rule.Service)
 }
@@ -1265,7 +1265,7 @@ func TestReconcile_container_name_preserved(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["whoami.example.com|"]
+	rule, ok := st.Rules["whoami.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "my-whoami", rule.ContainerName)
 }
@@ -1293,7 +1293,7 @@ func TestReconcile_source_prefix_preserved(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["whoami.example.com|"]
+	rule, ok := st.Rules["whoami.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "cloudflare.tunnel", rule.SourcePrefix)
 }
@@ -1321,7 +1321,7 @@ func TestReconcile_source_index_preserved(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app0.example.com|"]
+	rule, ok := st.Rules["app0.example.com"]
 	require.True(t, ok)
 	require.NotNil(t, rule.SourceIndex)
 	assert.Equal(t, 0, *rule.SourceIndex)
@@ -1350,7 +1350,7 @@ func TestReconcile_timestamps_set(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.False(t, rule.FirstSeen.IsZero())
 	assert.False(t, rule.LastSeen.IsZero())
@@ -1384,7 +1384,7 @@ func TestReconcile_pending_timestamps_set(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "pending", rule.Status)
 	assert.NotNil(t, rule.PendingSince)
@@ -1416,7 +1416,7 @@ func TestReconcile_no_tls_verify_preserved(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.True(t, rule.NoTLSVerify)
 }
@@ -1445,7 +1445,7 @@ func TestReconcile_origin_server_name_preserved(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "app.internal", rule.OriginServerName)
 }
@@ -1474,7 +1474,7 @@ func TestReconcile_zone_name_preserved(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "example.com", rule.ZoneName)
 }
@@ -1531,7 +1531,7 @@ func TestReconcile_service_preserved(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "http://app:8080", rule.Service)
 }
@@ -1559,7 +1559,7 @@ func TestReconcile_hostname_preserved(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["my-app.example.com|"]
+	rule, ok := st.Rules["my-app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "my-app.example.com", rule.Hostname)
 }
@@ -1587,7 +1587,7 @@ func TestReconcile_status_active(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "active", rule.Status)
 }
@@ -1615,7 +1615,7 @@ func TestReconcile_first_seen_not_changed_on_update(t *testing.T) {
 
 	st1, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule1, ok := st1.Rules["app.example.com|"]
+	rule1, ok := st1.Rules["app.example.com"]
 	require.True(t, ok)
 	firstSeen := rule1.FirstSeen
 
@@ -1627,7 +1627,7 @@ func TestReconcile_first_seen_not_changed_on_update(t *testing.T) {
 
 	st2, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule2, ok := st2.Rules["app.example.com|"]
+	rule2, ok := st2.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, firstSeen, rule2.FirstSeen)
 }
@@ -1655,7 +1655,7 @@ func TestReconcile_last_seen_updated_on_change(t *testing.T) {
 
 	st1, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule1, ok := st1.Rules["app.example.com|"]
+	rule1, ok := st1.Rules["app.example.com"]
 	require.True(t, ok)
 	lastSeen := rule1.LastSeen
 
@@ -1669,7 +1669,7 @@ func TestReconcile_last_seen_updated_on_change(t *testing.T) {
 
 	st2, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule2, ok := st2.Rules["app.example.com|"]
+	rule2, ok := st2.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.True(t, rule2.LastSeen.After(lastSeen))
 }
@@ -1707,7 +1707,7 @@ func TestReconcile_pending_since_cleared_on_back_to_active(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Nil(t, rule.PendingSince)
 }
@@ -1745,7 +1745,7 @@ func TestReconcile_delete_after_cleared_on_back_to_active(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Nil(t, rule.DeleteAfter)
 }
@@ -1778,7 +1778,7 @@ func TestReconcile_pending_status_on_removal(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "pending", rule.Status)
 }
@@ -1794,7 +1794,7 @@ func TestReconcile_expired_status_on_expiry(t *testing.T) {
 	st.Tunnel = rules.TunnelInfo{ID: "tunnel-uuid", Name: "homelab"}
 	expiredTime := time.Now().Add(-time.Hour)
 	deleteAfter := time.Now().Add(-time.Minute)
-	st.Rules["app.example.com|"] = rules.Rule{
+	st.Rules["app.example.com"] = rules.Rule{
 		Hostname: "app.example.com", Service: "http://app:80", Status: "pending",
 		FirstSeen: expiredTime, LastSeen: expiredTime,
 		DeleteAfter: &deleteAfter, PendingSince: &expiredTime,
@@ -1808,7 +1808,7 @@ func TestReconcile_expired_status_on_expiry(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	assert.NotContains(t, st.Rules, "app.example.com|")
+	assert.NotContains(t, st.Rules, "app.example.com")
 }
 
 func TestReconcile_container_name_change(t *testing.T) {
@@ -1840,7 +1840,7 @@ func TestReconcile_container_name_change(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "app-renamed", rule.ContainerName)
 }
@@ -1881,7 +1881,7 @@ func TestReconcile_source_prefix_change(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "dockflare", rule.SourcePrefix)
 }
@@ -1919,7 +1919,7 @@ func TestReconcile_source_index_change(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	require.NotNil(t, rule.SourceIndex)
 	assert.Equal(t, 0, *rule.SourceIndex)
@@ -1954,7 +1954,7 @@ func TestReconcile_no_tls_verify_change(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.True(t, rule.NoTLSVerify)
 }
@@ -1988,7 +1988,7 @@ func TestReconcile_origin_server_name_change(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "app.internal", rule.OriginServerName)
 }
@@ -2022,7 +2022,7 @@ func TestReconcile_zone_name_change(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "example.com", rule.ZoneName)
 }
@@ -2091,7 +2091,7 @@ func TestReconcile_service_change(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "http://app:8080", rule.Service)
 }
@@ -2125,7 +2125,7 @@ func TestReconcile_hostname_change(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["new-app.example.com|"]
+	rule, ok := st.Rules["new-app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "new-app.example.com", rule.Hostname)
 }
@@ -2158,7 +2158,7 @@ func TestReconcile_status_change_on_removal(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "pending", rule.Status)
 }
@@ -2196,7 +2196,7 @@ func TestReconcile_status_change_on_back_to_active(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	rule, ok := st.Rules["app.example.com|"]
+	rule, ok := st.Rules["app.example.com"]
 	require.True(t, ok)
 	assert.Equal(t, "active", rule.Status)
 }
@@ -2212,7 +2212,7 @@ func TestReconcile_status_change_on_expiry(t *testing.T) {
 	st.Tunnel = rules.TunnelInfo{ID: "tunnel-uuid", Name: "homelab"}
 	expiredTime := time.Now().Add(-time.Hour)
 	deleteAfter := time.Now().Add(-time.Minute)
-	st.Rules["app.example.com|"] = rules.Rule{
+	st.Rules["app.example.com"] = rules.Rule{
 		Hostname: "app.example.com", Service: "http://app:80", Status: "pending",
 		FirstSeen: expiredTime, LastSeen: expiredTime,
 		DeleteAfter: &deleteAfter, PendingSince: &expiredTime,
@@ -2226,5 +2226,5 @@ func TestReconcile_status_change_on_expiry(t *testing.T) {
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
-	assert.NotContains(t, st.Rules, "app.example.com|")
+	assert.NotContains(t, st.Rules, "app.example.com")
 }

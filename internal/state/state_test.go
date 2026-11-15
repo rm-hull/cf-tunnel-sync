@@ -18,7 +18,7 @@ func TestSaveLoad_roundtrip(t *testing.T) {
 	now := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	state := NewState()
-	state.Rules["whoami.example.com|"] = Rule{
+	state.Rules["whoami.example.com"] = Rule{
 		Hostname:  "whoami.example.com",
 		Service:   "http://whoami:80",
 		Status:    "active",
@@ -34,7 +34,7 @@ func TestSaveLoad_roundtrip(t *testing.T) {
 	require.NoError(t, err, "load")
 
 	require.Len(t, loaded.Rules, 1)
-	r := loaded.Rules["whoami.example.com|"]
+	r := loaded.Rules["whoami.example.com"]
 	assert.Equal(t, "whoami.example.com", r.Hostname)
 	assert.Equal(t, "active", r.Status)
 	assert.Equal(t, now, r.FirstSeen)
@@ -96,7 +96,7 @@ func TestSave_atomic_write(t *testing.T) {
 
 	// Write initial state
 	state1 := NewState()
-	state1.Rules["whoami.example.com|"] = Rule{
+	state1.Rules["whoami.example.com"] = Rule{
 		Hostname: "whoami.example.com",
 		Service:  "http://whoami:80",
 		Status:   "active",
@@ -132,7 +132,7 @@ func TestSaveLoad_pending_fields(t *testing.T) {
 	deleteAfter := now.Add(7 * time.Hour)
 
 	state := NewState()
-	state.Rules["whoami.example.com|"] = Rule{
+	state.Rules["whoami.example.com"] = Rule{
 		Hostname:     "whoami.example.com",
 		Service:      "http://whoami:80",
 		Status:       "pending",
@@ -149,7 +149,7 @@ func TestSaveLoad_pending_fields(t *testing.T) {
 	loaded, err := Load(path)
 	require.NoError(t, err, "load")
 
-	r := loaded.Rules["whoami.example.com|"]
+	r := loaded.Rules["whoami.example.com"]
 	assert.Equal(t, "pending", r.Status)
 	require.NotNil(t, r.PendingSince)
 	assert.Equal(t, pendingSince, *r.PendingSince)

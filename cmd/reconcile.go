@@ -36,7 +36,10 @@ func NewReconcileCmd() *cobra.Command {
 				return err
 			}
 
-			cfAPI := cf.New("", cfg.Cloudflare.AccountID, cfg.Cloudflare.ZoneID, log)
+			cfAPI, err := cf.New(string(cfg.Cloudflare.APIToken), cfg.Cloudflare.AccountID, cfg.Cloudflare.ZoneID, log)
+			if err != nil {
+				return err
+			}
 
 			grace, err := time.ParseDuration(cfg.Reconcile.GracePeriod)
 			if err != nil {

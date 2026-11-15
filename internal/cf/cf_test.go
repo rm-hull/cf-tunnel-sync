@@ -228,7 +228,7 @@ func TestPlan_emptyDiff(t *testing.T) {
 	fake.AddZone(cf.Zone{ID: "z1", Name: "example.com"})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {
+		"app.example.com": {
 			Hostname: "app.example.com",
 			Service:  "http://app:80",
 			Status:   "active",
@@ -263,7 +263,7 @@ func TestPlan_addRule(t *testing.T) {
 	})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {
+		"app.example.com": {
 			Hostname: "app.example.com",
 			Service:  "http://app:80",
 			Status:   "active",
@@ -318,7 +318,7 @@ func TestPlan_dnsCreate(t *testing.T) {
 	fake.AddZone(cf.Zone{ID: "z1", Name: "example.com"})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {
+		"app.example.com": {
 			Hostname: "app.example.com",
 			Service:  "http://app:80",
 			Status:   "active",
@@ -349,7 +349,7 @@ func TestPlan_dnsAdopt(t *testing.T) {
 	})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {
+		"app.example.com": {
 			Hostname: "app.example.com",
 			Service:  "http://app:80",
 			Status:   "active",
@@ -379,7 +379,7 @@ func TestPlan_dnsConflict(t *testing.T) {
 	})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {
+		"app.example.com": {
 			Hostname: "app.example.com",
 			Service:  "http://app:80",
 			Status:   "active",
@@ -492,7 +492,7 @@ func TestPlan_overwriteConflicts(t *testing.T) {
 	})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {
+		"app.example.com": {
 			Hostname: "app.example.com",
 			Service:  "http://app:80",
 			Status:   "active",
@@ -513,7 +513,7 @@ func TestPlan_dnsNoZone(t *testing.T) {
 	fake.AddZone(cf.Zone{ID: "z1", Name: "example.com"})
 
 	desired := map[string]rules.Rule{
-		"app.unknown.net|": {
+		"app.unknown.net": {
 			Hostname: "app.unknown.net",
 			Service:  "http://app:80",
 			Status:   "active",
@@ -557,7 +557,7 @@ func TestPlan_localIngressRendered(t *testing.T) {
 	fake.AddTunnel(cf.Tunnel{ID: "abc", Name: "homelab", ConfigSrc: "cloudflare"})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {
+		"app.example.com": {
 			Hostname: "app.example.com",
 			Service:  "http://app:80",
 			Status:   "active",
@@ -608,7 +608,7 @@ func TestPlan_originRequest(t *testing.T) {
 	fake.AddTunnel(cf.Tunnel{ID: "abc", Name: "homelab", ConfigSrc: "cloudflare"})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {
+		"app.example.com": {
 			Hostname:         "app.example.com",
 			Service:          "https://app:443",
 			NoTLSVerify:      true,
@@ -630,12 +630,12 @@ func TestPlan_wildcardOrdering(t *testing.T) {
 	fake.AddTunnel(cf.Tunnel{ID: "abc", Name: "homelab", ConfigSrc: "cloudflare"})
 
 	desired := map[string]rules.Rule{
-		"*.example.com|": {
+		"*.example.com": {
 			Hostname: "*.example.com",
 			Service:  "http://wildcard:80",
 			Status:   "active",
 		},
-		"app.example.com|": {
+		"app.example.com": {
 			Hostname: "app.example.com",
 			Service:  "http://app:80",
 			Status:   "active",
@@ -764,8 +764,8 @@ func TestPlan_multipleRules(t *testing.T) {
 	fake.AddZone(cf.Zone{ID: "z1", Name: "example.com"})
 
 	desired := map[string]rules.Rule{
-		"a.example.com|": {Hostname: "a.example.com", Service: "http://a:80", Status: "active"},
-		"b.example.com|": {Hostname: "b.example.com", Service: "http://b:80", Status: "active"},
+		"a.example.com": {Hostname: "a.example.com", Service: "http://a:80", Status: "active"},
+		"b.example.com": {Hostname: "b.example.com", Service: "http://b:80", Status: "active"},
 	}
 
 	result, err := fake.Plan(context.Background(), "abc", desired, rules.NewState(), false)
@@ -805,7 +805,7 @@ func TestPlan_noOrphanForActiveRule(t *testing.T) {
 	})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {Hostname: "app.example.com", Service: "http://app:80", Status: "active"},
+		"app.example.com": {Hostname: "app.example.com", Service: "http://app:80", Status: "active"},
 	}
 
 	result, err := fake.Plan(context.Background(), "abc", desired, rules.NewState(), false)
@@ -820,7 +820,7 @@ func TestPlan_nilState(t *testing.T) {
 	fake.AddZone(cf.Zone{ID: "z1", Name: "example.com"})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {Hostname: "app.example.com", Service: "http://app:80", Status: "active"},
+		"app.example.com": {Hostname: "app.example.com", Service: "http://app:80", Status: "active"},
 	}
 
 	result, err := fake.Plan(context.Background(), "abc", desired, nil, false)
@@ -858,7 +858,7 @@ func TestPlan_statsIncremented(t *testing.T) {
 	fake.AddZone(cf.Zone{ID: "z1", Name: "example.com"})
 
 	desired := map[string]rules.Rule{
-		"app.example.com|": {Hostname: "app.example.com", Service: "http://app:80", Status: "active"},
+		"app.example.com": {Hostname: "app.example.com", Service: "http://app:80", Status: "active"},
 	}
 
 	_, _ = fake.Plan(context.Background(), "abc", desired, rules.NewState(), false)

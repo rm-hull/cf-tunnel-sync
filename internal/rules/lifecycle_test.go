@@ -14,7 +14,7 @@ func TestApply_new_rule(t *testing.T) {
 	grace := 8 * time.Hour
 
 	desired := map[string]Rule{
-		"whoami.example.com|": {
+		"whoami.example.com": {
 			Hostname: "whoami.example.com",
 			Service:  "http://whoami:80",
 		},
@@ -24,7 +24,7 @@ func TestApply_new_rule(t *testing.T) {
 	_, active, pending, expired := Apply(state, desired, now, grace)
 
 	require.Len(t, active, 1)
-	r := active["whoami.example.com|"]
+	r := active["whoami.example.com"]
 	assert.Equal(t, "active", r.Status)
 	assert.Equal(t, now, r.FirstSeen)
 	assert.Nil(t, r.PendingSince)
@@ -39,7 +39,7 @@ func TestApply_disappear_pending(t *testing.T) {
 	grace := 8 * time.Hour
 
 	state := NewState()
-	state.Rules["whoami.example.com|"] = Rule{
+	state.Rules["whoami.example.com"] = Rule{
 		Hostname:  "whoami.example.com",
 		Service:   "http://whoami:80",
 		Status:    "active",
@@ -53,7 +53,7 @@ func TestApply_disappear_pending(t *testing.T) {
 
 	assert.Empty(t, active)
 	require.Len(t, pending, 1)
-	r := pending["whoami.example.com|"]
+	r := pending["whoami.example.com"]
 	assert.Equal(t, "pending", r.Status)
 	require.NotNil(t, r.PendingSince)
 	assert.Equal(t, now, *r.PendingSince)
@@ -71,7 +71,7 @@ func TestApply_pending_returned_to_active(t *testing.T) {
 	deleteAfter := pendingSince.Add(grace)
 
 	state := NewState()
-	state.Rules["whoami.example.com|"] = Rule{
+	state.Rules["whoami.example.com"] = Rule{
 		Hostname:     "whoami.example.com",
 		Service:      "http://whoami:80",
 		Status:       "pending",
@@ -82,7 +82,7 @@ func TestApply_pending_returned_to_active(t *testing.T) {
 	}
 
 	desired := map[string]Rule{
-		"whoami.example.com|": {
+		"whoami.example.com": {
 			Hostname: "whoami.example.com",
 			Service:  "http://whoami:80",
 		},
@@ -91,7 +91,7 @@ func TestApply_pending_returned_to_active(t *testing.T) {
 	_, active, pending, _ := Apply(state, desired, now, grace)
 
 	require.Len(t, active, 1)
-	r := active["whoami.example.com|"]
+	r := active["whoami.example.com"]
 	assert.Equal(t, "active", r.Status)
 	assert.Nil(t, r.PendingSince)
 	assert.Nil(t, r.DeleteAfter)
@@ -107,7 +107,7 @@ func TestApply_expiry(t *testing.T) {
 	deleteAfter := pendingSince.Add(grace)
 
 	state := NewState()
-	state.Rules["whoami.example.com|"] = Rule{
+	state.Rules["whoami.example.com"] = Rule{
 		Hostname:     "whoami.example.com",
 		Service:      "http://whoami:80",
 		Status:       "pending",
@@ -124,9 +124,9 @@ func TestApply_expiry(t *testing.T) {
 	assert.Empty(t, active)
 	assert.Empty(t, pending)
 	require.Len(t, expired, 1)
-	assert.Contains(t, expired, "whoami.example.com|")
+	assert.Contains(t, expired, "whoami.example.com")
 	// Rule should be removed from state
-	assert.NotContains(t, state.Rules, "whoami.example.com|")
+	assert.NotContains(t, state.Rules, "whoami.example.com")
 }
 
 // TestApply_field_change tests that a rule with changed fields is updated in place.
@@ -135,7 +135,7 @@ func TestApply_field_change(t *testing.T) {
 	grace := 8 * time.Hour
 
 	state := NewState()
-	state.Rules["whoami.example.com|"] = Rule{
+	state.Rules["whoami.example.com"] = Rule{
 		Hostname:  "whoami.example.com",
 		Service:   "http://whoami:80",
 		Status:    "active",
@@ -144,7 +144,7 @@ func TestApply_field_change(t *testing.T) {
 	}
 
 	desired := map[string]Rule{
-		"whoami.example.com|": {
+		"whoami.example.com": {
 			Hostname: "whoami.example.com",
 			Service:  "http://whoami:8080",
 			Path:     "/api",
@@ -154,7 +154,7 @@ func TestApply_field_change(t *testing.T) {
 	_, active, _, _ := Apply(state, desired, now, grace)
 
 	require.Len(t, active, 1)
-	r := active["whoami.example.com|"]
+	r := active["whoami.example.com"]
 	assert.Equal(t, "http://whoami:8080", r.Service)
 	assert.Equal(t, "/api", r.Path)
 	assert.Equal(t, now.Add(-time.Hour), r.FirstSeen)
@@ -168,7 +168,7 @@ func TestApply_state_roundtrip(t *testing.T) {
 	// First pass: add rule
 	state := NewState()
 	desired1 := map[string]Rule{
-		"whoami.example.com|": {
+		"whoami.example.com": {
 			Hostname: "whoami.example.com",
 			Service:  "http://whoami:80",
 		},
@@ -180,7 +180,7 @@ func TestApply_state_roundtrip(t *testing.T) {
 	state2, active, _, _ := Apply(state, desired1, now.Add(time.Minute), grace)
 
 	require.Len(t, active, 1)
-	r := active["whoami.example.com|"]
+	r := active["whoami.example.com"]
 	assert.Equal(t, "active", r.Status)
 	assert.Equal(t, now, r.FirstSeen)
 	_ = state2
@@ -195,7 +195,7 @@ func TestApply_no_expiry_before_delete_after(t *testing.T) {
 	deleteAfter := pendingSince.Add(grace)
 
 	state := NewState()
-	state.Rules["whoami.example.com|"] = Rule{
+	state.Rules["whoami.example.com"] = Rule{
 		Hostname:     "whoami.example.com",
 		Service:      "http://whoami:80",
 		Status:       "pending",

@@ -37,12 +37,15 @@ func NewPlanCmd() *cobra.Command {
 				return err
 			}
 
-			cfAPI := cf.New(
+			cfAPI, err := cf.New(
 				string(cfg.Cloudflare.APIToken),
 				cfg.Cloudflare.AccountID,
 				cfg.Cloudflare.ZoneID,
 				log,
 			)
+			if err != nil {
+				return err
+			}
 
 			desiredRules, _, err := dockerAPI.DesiredRules(cmd.Context(), cfg.Labels.Prefixes, cfg.Labels.AllowUnprotectedAccess)
 			if err != nil {

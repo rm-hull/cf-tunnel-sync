@@ -280,22 +280,30 @@ func (f *Fake) Plan(ctx context.Context, tunnelID string, desiredRules map[strin
 		LocalIngress:  localIngress,
 	}
 
+	// ingressKey builds a comparison key for an ingress entry.
+	ingressKey := func(hostname, path string) string {
+		if path == "" {
+			return hostname
+		}
+		return hostname + "|" + path
+	}
+
 	// Compare ingress rules
 	remoteKeys := make(map[string]bool)
 	for _, r := range remoteCfg.Rules {
-		key := r.Hostname + "|" + r.Path
+		key := ingressKey(r.Hostname, r.Path)
 		remoteKeys[key] = true
 	}
 
 	localKeys := make(map[string]bool)
 	for _, r := range localIngress {
-		key := r.Hostname + "|" + r.Path
+		key := ingressKey(r.Hostname, r.Path)
 		localKeys[key] = true
 	}
 
 	// Rules to add or update
 	for _, r := range localIngress {
-		key := r.Hostname + "|" + r.Path
+		key := ingressKey(r.Hostname, r.Path)
 		if !remoteKeys[key] {
 			result.IngressActions = append(result.IngressActions, PlanAction{
 				Kind:    "add",
@@ -309,8 +317,8 @@ func (f *Fake) Plan(ctx context.Context, tunnelID string, desiredRules map[strin
 	// Rules to remove (remote-only)
 	for key := range remoteKeys {
 		if !localKeys[key] {
-			// Check if it's the catch-all
-			if strings.HasSuffix(key, "|") && !strings.Contains(key, ".") {
+			// Check if it's the catch-all (no hostname, just http_status)
+			if !strings.Contains(key, ".") {
 				continue
 			}
 			result.IngressActions = append(result.IngressActions, PlanAction{

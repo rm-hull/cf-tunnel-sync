@@ -628,5 +628,5 @@ func TestRule_Key(t *testing.T) {
 
 func TestRule_Key_no_path(t *testing.T) {
 	r := Rule{Hostname: "App.Example.COM"}
-	assert.Equal(t, "app.example.com|", r.Key())
+	assert.Equal(t, "app.example.com", r.Key())
 }

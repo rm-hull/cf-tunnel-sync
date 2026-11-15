@@ -27,7 +27,11 @@ type Rule struct {
 }
 
 // Key returns the deterministic rule key: lower(hostname) + "|" + path.
+// If path is empty, the key is just the lowercased hostname.
 func (r Rule) Key() string {
+	if r.Path == "" {
+		return strings.ToLower(r.Hostname)
+	}
 	return strings.ToLower(r.Hostname) + "|" + r.Path
 }
 

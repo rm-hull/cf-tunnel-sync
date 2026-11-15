@@ -29,7 +29,7 @@ func TestDesiredRules_singleContainer(t *testing.T) {
 	rules, issues, err := api.DesiredRules(context.Background(), []string{"cloudflare.tunnel"}, false)
 	require.NoError(t, err)
 	require.Len(t, rules, 1)
-	r := rules["whoami.example.com|"]
+	r := rules["whoami.example.com"]
 	assert.Equal(t, "whoami.example.com", r.Hostname)
 	assert.Equal(t, "http://whoami:80", r.Service)
 	assert.Equal(t, "whoami", r.ContainerName)
@@ -152,7 +152,7 @@ func TestDesiredRules_duplicateKey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, rules, 1)
 	// alpha wins (sorted first)
-	assert.Equal(t, "alpha", rules["same.example.com|"].ContainerName)
+	assert.Equal(t, "alpha", rules["same.example.com"].ContainerName)
 	assert.Len(t, issues, 1)
 	assert.Equal(t, "conflict", issues[0].Kind)
 }

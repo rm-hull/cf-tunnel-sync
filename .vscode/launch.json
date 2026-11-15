@@ -13,8 +13,7 @@
       "args": [
         "reconcile",
         "--config",
-        "./config.example.yaml",
-        "--dry-run"
+        "./config.example.yaml"
       ],
       "showLog": true
     }

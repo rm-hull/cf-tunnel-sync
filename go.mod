@@ -3,8 +3,10 @@ module github.com/rm-hull/cf-tunnel-sync
 go 1.27
 
 require (
+	github.com/cloudflare/cloudflare-go v0.119.0
 	github.com/invopop/jsonschema v0.14.0
 	github.com/jedib0t/go-pretty/v6 v6.9.2
+	github.com/joho/godotenv v1.5.1
 	github.com/moby/moby/api v1.57.0
 	github.com/moby/moby/client v0.6.3
 	github.com/spf13/cobra v1.10.2
@@ -18,7 +20,6 @@ require (
 	github.com/buger/jsonparser v1.6.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
-	github.com/cloudflare/cloudflare-go v0.119.0 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
@@ -27,10 +28,9 @@ require (
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/goccy/go-json v0.10.5 // indirect
-	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/goccy/go-json v0.12.0 // indirect
+	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -45,8 +45,8 @@ require (
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
-	golang.org/x/net v0.34.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
-	golang.org/x/time v0.11.0 // indirect
+	golang.org/x/time v0.16.0 // indirect
 )

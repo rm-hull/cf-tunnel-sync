@@ -15,7 +15,7 @@ import (
 // non-wildcard before wildcard, path before no-path, longer path first, hostname asc, service asc.
 func TestRenderIngress_order(t *testing.T) {
 	rules := map[string]Rule{
-		"*.example.com|": {
+		"*.example.com": {
 			Hostname: "*.example.com",
 			Service:  "http://catchall:80",
 			Status:   "active",
@@ -38,12 +38,12 @@ func TestRenderIngress_order(t *testing.T) {
 			Service:  "http://api-v1:80",
 			Status:   "active",
 		},
-		"app.example.com|": {
+		"app.example.com": {
 			Hostname: "app.example.com",
 			Service:  "http://app-root:80",
 			Status:   "active",
 		},
-		"web.example.com|": {
+		"web.example.com": {
 			Hostname: "web.example.com",
 			Service:  "http://web:80",
 			Status:   "active",
@@ -92,18 +92,18 @@ func TestRenderIngress_catch_all(t *testing.T) {
 // TestRenderIngress_origin_request tests that originRequest is only included when needed.
 func TestRenderIngress_origin_request(t *testing.T) {
 	rules := map[string]Rule{
-		"simple.example.com|": {
+		"simple.example.com": {
 			Hostname: "simple.example.com",
 			Service:  "http://simple:80",
 			Status:   "active",
 		},
-		"tls.example.com|": {
+		"tls.example.com": {
 			Hostname:    "tls.example.com",
 			Service:     "http://tls:80",
 			NoTLSVerify: true,
 			Status:      "active",
 		},
-		"sni.example.com|": {
+		"sni.example.com": {
 			Hostname:         "sni.example.com",
 			Service:          "http://sni:80",
 			OriginServerName: "sni.example.com",
@@ -130,17 +130,17 @@ func TestRenderIngress_origin_request(t *testing.T) {
 // TestRenderIngress_deterministic tests that output is identical for shuffled input.
 func TestRenderIngress_deterministic(t *testing.T) {
 	rules := map[string]Rule{
-		"whoami.example.com|": {
+		"whoami.example.com": {
 			Hostname: "whoami.example.com",
 			Service:  "http://whoami:80",
 			Status:   "active",
 		},
-		"vault.example.com|": {
+		"vault.example.com": {
 			Hostname: "vault.example.com",
 			Service:  "http://vault:80",
 			Status:   "active",
 		},
-		"web.example.com|": {
+		"web.example.com": {
 			Hostname: "web.example.com",
 			Service:  "http://web:80",
 			Status:   "active",
@@ -159,21 +159,21 @@ func TestRenderIngress_deterministic(t *testing.T) {
 func TestRenderIngress_golden(t *testing.T) {
 	now := time.Now()
 	rules := map[string]Rule{
-		"whoami.destructuring-bind.org|": {
+		"whoami.destructuring-bind.org": {
 			Hostname:  "whoami.destructuring-bind.org",
 			Service:   "http://whoami:80",
 			Status:    "active",
 			FirstSeen: now,
 			LastSeen:  now,
 		},
-		"vault.destructuring-bind.org|": {
+		"vault.destructuring-bind.org": {
 			Hostname:  "vault.destructuring-bind.org",
 			Service:   "http://vaultwarden:80",
 			Status:    "active",
 			FirstSeen: now,
 			LastSeen:  now,
 		},
-		"cors-proxy.destructuring-bind.org|": {
+		"cors-proxy.destructuring-bind.org": {
 			Hostname:  "cors-proxy.destructuring-bind.org",
 			Service:   "http://cors-proxy:8080",
 			Status:    "active",
@@ -200,12 +200,12 @@ func TestRenderIngress_golden(t *testing.T) {
 // TestRenderIngress_excludes_expired tests that expired rules are not included.
 func TestRenderIngress_excludes_expired(t *testing.T) {
 	rules := map[string]Rule{
-		"active.example.com|": {
+		"active.example.com": {
 			Hostname: "active.example.com",
 			Service:  "http://active:80",
 			Status:   "active",
 		},
-		"expired.example.com|": {
+		"expired.example.com": {
 			Hostname: "expired.example.com",
 			Service:  "http://expired:80",
 			Status:   "expired",
@@ -222,7 +222,7 @@ func TestRenderIngress_excludes_expired(t *testing.T) {
 // TestRenderIngress_includes_pending tests that pending rules are included in ingress.
 func TestRenderIngress_includes_pending(t *testing.T) {
 	rules := map[string]Rule{
-		"pending.example.com|": {
+		"pending.example.com": {
 			Hostname: "pending.example.com",
 			Service:  "http://pending:80",
 			Status:   "pending",
