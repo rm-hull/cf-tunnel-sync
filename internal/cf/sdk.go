@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"strings"
 	"sync"
 
 	cfdns "github.com/cloudflare/cloudflare-go"
@@ -378,10 +379,192 @@ func (s *sdkAPI) DeleteDNSRecord(ctx context.Context, recordID string) error {
 }
 
 // Plan performs a dry-run reconciliation.
-func (s *sdkAPI) Plan(_ context.Context, _ string, _ map[string]rulespkg.Rule,
-	_ *rulespkg.State, _ bool,
+func (s *sdkAPI) Plan(ctx context.Context, tunnelID string, desiredRules map[string]rulespkg.Rule,
+	state *rulespkg.State, overwriteConflicts bool,
 ) (PlanResult, error) {
-	return PlanResult{}, nil
+	s.log.Debug("plan reconciliation", "tunnel", tunnelID)
+
+	tunnel, err := s.GetTunnel(ctx, tunnelID)
+	if err != nil {
+		return PlanResult{}, err
+	}
+
+	remoteCfg, err := s.GetIngress(ctx, tunnelID)
+	if err != nil {
+		return PlanResult{}, err
+	}
+
+	localIngress := rulespkg.RenderIngress(desiredRules)
+
+	result := PlanResult{
+		Tunnel:        tunnel,
+		RemoteIngress: remoteCfg.Rules,
+		LocalIngress:  localIngress,
+	}
+
+	// ingressKey builds a comparison key for an ingress entry.
+	ingressKey := func(hostname, path string) string {
+		if path == "" {
+			return hostname
+		}
+		return hostname + "|" + path
+	}
+
+	// Compare ingress rules
+	remoteKeys := make(map[string]bool)
+	for _, r := range remoteCfg.Rules {
+		key := ingressKey(r.Hostname, r.Path)
+		remoteKeys[key] = true
+	}
+
+	localKeys := make(map[string]bool)
+	for _, r := range localIngress {
+		key := ingressKey(r.Hostname, r.Path)
+		localKeys[key] = true
+	}
+
+	// Rules to add or update
+	for _, r := range localIngress {
+		key := ingressKey(r.Hostname, r.Path)
+		if !remoteKeys[key] {
+			result.IngressActions = append(result.IngressActions, PlanAction{
+				Kind:    "add",
+				RuleKey: key,
+				Detail:  r.Hostname + " -> " + r.Service,
+			})
+		}
+		localKeys[key] = true
+	}
+
+	// Rules to remove (remote-only)
+	for key := range remoteKeys {
+		if !localKeys[key] {
+			// Check if it's the catch-all (no hostname, just http_status)
+			if !strings.Contains(key, ".") {
+				continue
+			}
+			result.IngressActions = append(result.IngressActions, PlanAction{
+				Kind:    "remove",
+				RuleKey: key,
+				Detail:  "not from labels",
+			})
+		}
+	}
+
+	// Fetch zones for DNS resolution
+	zones, err := s.ListZones(ctx)
+	if err != nil {
+		s.log.Debug("plan: could not list zones for DNS check", "error", err)
+	}
+
+	// DNS actions
+	for key, rule := range desiredRules {
+		zoneID := ""
+		if state != nil {
+			if sr, ok := state.Rules[key]; ok && sr.ZoneName != "" {
+				for _, z := range zones {
+					if z.Name == sr.ZoneName {
+						zoneID = z.ID
+						break
+					}
+				}
+			}
+		}
+
+		// Try to resolve zone by zonename
+		if zoneID == "" {
+			for _, z := range zones {
+				if rule.ZoneName != "" && z.Name == rule.ZoneName {
+					zoneID = z.ID
+					break
+				}
+			}
+		}
+
+		// Try longest suffix match
+		if zoneID == "" {
+			h := rule.Hostname
+			for _, z := range zones {
+				zName := z.Name
+				if h == zName || (len(h) > len(zName) && h[len(h)-len(zName)-1:] == "."+zName) {
+					zoneID = z.ID
+					break
+				}
+			}
+		}
+
+		if zoneID == "" {
+			result.DNSActions = append(result.DNSActions, PlanAction{
+				Kind:    "dns_no_zone",
+				RuleKey: key,
+				Detail:  rule.Hostname + ": no zone found",
+			})
+			continue
+		}
+
+		// Check existing DNS records
+		records, err := s.ListDNSRecords(ctx, zoneID, rule.Hostname, "CNAME")
+		if err != nil {
+			s.log.Debug("plan: could not list DNS records", "hostname", rule.Hostname, "error", err)
+			continue
+		}
+
+		found := false
+		for _, rec := range records {
+			if rec.Content == tunnel.ID+".cfargotunnel.com" {
+				result.DNSActions = append(result.DNSActions, PlanAction{
+					Kind:    "dns_adopt",
+					RuleKey: key,
+					Detail:  rule.Hostname + " -> " + rec.Content,
+				})
+				found = true
+				break
+			} else if !overwriteConflicts {
+				result.DNSActions = append(result.DNSActions, PlanAction{
+					Kind:    "dns_conflict",
+					RuleKey: key,
+					Detail:  rule.Hostname + " points to " + rec.Content,
+				})
+				found = true
+				break
+			}
+		}
+		if !found {
+			result.DNSActions = append(result.DNSActions, PlanAction{
+				Kind:    "dns_create",
+				RuleKey: key,
+				Detail:  rule.Hostname + " -> " + tunnel.ID + ".cfargotunnel.com",
+			})
+		}
+	}
+
+	// Orphan DNS records — only CNAMEs pointing to this tunnel that are not desired
+	targetCNAME := tunnel.ID + ".cfargotunnel.com"
+	for _, z := range zones {
+		records, err := s.ListDNSRecords(ctx, z.ID, "", "CNAME")
+		if err != nil {
+			s.log.Debug("plan: could not list DNS records for orphan check", "zone", z.ID, "error", err)
+			continue
+		}
+		for _, rec := range records {
+			if rec.Content == targetCNAME {
+				isOrphan := true
+				for _, rule := range desiredRules {
+					if rule.Hostname == rec.Name {
+						isOrphan = false
+						break
+					}
+				}
+				if isOrphan {
+					rec.ZoneName = z.Name
+					result.OrphanDNS = append(result.OrphanDNS, rec)
+				}
+			}
+		}
+	}
+
+	s.log.Debug("plan complete", "ingressActions", len(result.IngressActions), "dnsActions", len(result.DNSActions), "orphans", len(result.OrphanDNS))
+	return result, nil
 }
 
 // GetStats returns API call statistics.
