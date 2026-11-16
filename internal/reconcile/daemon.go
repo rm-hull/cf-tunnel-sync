@@ -23,6 +23,7 @@ type DaemonConfig struct {
 type Snapshot struct {
 	TunnelID      string
 	TunnelName    string
+	Connections   int
 	PassCount     int
 	LastDuration  time.Duration
 	LastError     error
@@ -225,6 +226,16 @@ func (d *Daemon) runPass(ctx context.Context) {
 
 	duration := time.Since(start)
 
+	// Fetch active connections from Cloudflare
+	connections := 0
+	if res.Tunnel.ID != "" {
+		var err error
+		connections, err = d.cfAPI.GetConnections(ctx, res.Tunnel.ID)
+		if err != nil {
+			d.log.Debug("get connections failed", "error", err)
+		}
+	}
+
 	d.mu.Lock()
 	d.snap.PassCount++
 	d.snap.LastDuration = duration
@@ -233,6 +244,7 @@ func (d *Daemon) runPass(ctx context.Context) {
 	d.snap.RulesPending = res.RulesPending
 	d.snap.RulesExpired = res.RulesExpired
 	d.snap.RulesConflict = res.RulesConflict
+	d.snap.Connections = connections
 	if res.Tunnel.ID != "" {
 		d.snap.TunnelID = res.Tunnel.ID
 		d.snap.TunnelName = res.Tunnel.Name

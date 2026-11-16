@@ -11,10 +11,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// cspMiddleware adds Content-Security-Policy header to every response.
+// cspMiddleware adds security headers. The policy is relaxed to allow
+// Chrome DevTools to work (default-src 'self' instead of 'none').
 func cspMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+		c.Header("Content-Security-Policy", "default-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'self'; frame-ancestors 'none'")
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
 		c.Next()
 	}
 }
@@ -26,6 +29,7 @@ func (s *Server) handleIndex(c *gin.Context) {
 	funcMap := template.FuncMap{
 		"healthySentence": healthySentence,
 		"formatDuration":  formatDuration,
+		"formatUptime":    formatUptime,
 		"statusClass":     statusClass,
 		"statusLabel":     statusLabel,
 		"last": func(n int, items []LogEvent) []LogEvent {
@@ -116,6 +120,12 @@ func formatDuration(d time.Duration) string {
 		return d.Truncate(time.Second).String()
 	}
 	return d.Truncate(time.Minute).String()
+}
+
+// formatUptime formats uptime seconds for display.
+func formatUptime(seconds float64) string {
+	d := time.Duration(seconds * float64(time.Second))
+	return formatDuration(d)
 }
 
 // statusClass returns the CSS class for a rule status.

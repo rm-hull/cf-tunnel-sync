@@ -126,7 +126,8 @@ func Test_index_healthy(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "healthy")
 }
 
-// Test_index_no_script verifies the HTML contains no script tags or external resource URLs.
+// Test_index_no_script verifies the HTML contains no script tags.
+// External URLs in <a href> are allowed for route links that open in new tabs.
 func Test_index_no_script(t *testing.T) {
 	server := newTestServer(t)
 
@@ -138,13 +139,13 @@ func Test_index_no_script(t *testing.T) {
 	body := rec.Body.String()
 	assert.NotContains(t, body, "<script", "HTML should not contain script tags")
 
-	// Check that href= and src= attributes don't point to external URLs
+	// Check that src= attributes don't point to external URLs (href= is allowed for route links)
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "href=") || strings.Contains(line, "src=") {
-			assert.NotContains(t, line, "http://", "href/src should not use external URLs: %s", line)
-			assert.NotContains(t, line, "https://", "href/src should not use external URLs: %s", line)
+		if strings.Contains(line, "src=") {
+			assert.NotContains(t, line, "http://", "src should not use external URLs: %s", line)
+			assert.NotContains(t, line, "https://", "src should not use external URLs: %s", line)
 		}
 	}
 }
@@ -160,7 +161,7 @@ func Test_index_csp_header(t *testing.T) {
 
 	csp := rec.Header().Get("Content-Security-Policy")
 	assert.NotEmpty(t, csp, "CSP header should be present")
-	assert.Contains(t, csp, "default-src 'none'")
+	assert.Contains(t, csp, "default-src 'self'")
 }
 
 // Test_index_rules_table verifies the rules table shows active rules.
@@ -488,7 +489,8 @@ func Test_json_api_schema(t *testing.T) {
 	}
 }
 
-// Test_no_external_urls_in_html verifies no external URLs in the HTML output.
+// Test_no_external_urls_in_html verifies no external resource URLs in the HTML output.
+// Route links (<a href="https://...">) are allowed as they intentionally open services in new tabs.
 func Test_no_external_urls_in_html(t *testing.T) {
 	server := newTestServer(t)
 
@@ -499,14 +501,13 @@ func Test_no_external_urls_in_html(t *testing.T) {
 
 	body := rec.Body.String()
 
-	// Allow /static/ paths but not external URLs
+	// Check src= attributes don't load external resources (href= is allowed for route links)
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "href=") || strings.Contains(line, "src=") {
-			// Check for external URLs (not starting with /)
+		if strings.Contains(line, "src=") {
 			if strings.Contains(line, "http://") || strings.Contains(line, "https://") {
-				t.Errorf("Found external URL in HTML: %s", line)
+				t.Errorf("Found external resource URL in HTML: %s", line)
 			}
 		}
 	}

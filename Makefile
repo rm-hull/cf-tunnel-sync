@@ -15,8 +15,8 @@ test:
 lint:
 	golangci-lint run
 
-# Run CI checks (format, vet, lint, test)
-ci: fmt-check vet lint test
+# Run CI checks (format, vet, lint, test, css)
+ci: fmt-check vet lint test css-check
 
 # Format code
 fmt:
@@ -43,13 +43,21 @@ tools:
 	# Install gofumpt
 	go install mvdan.cc/gofumpt@latest
 
-# Generate CSS (placeholder for S10)
+# Generate CSS from Tailwind source (uses npx with pinned version)
 css:
-	@echo "CSS generation not yet implemented (S10)"
+	npx @tailwindcss/cli -i internal/web/assets/tailwind.css -o internal/web/static/app.css --minify
 
-# Check CSS (placeholder for S10)
+# Check CSS is up to date
 css-check:
-	@echo "CSS check not yet implemented (S10)"
+	@TMP=$$(mktemp); \
+	npx @tailwindcss/cli -i internal/web/assets/tailwind.css -o "$$TMP" --minify 2>/dev/null; \
+	if ! diff -q internal/web/static/app.css "$$TMP" >/dev/null 2>&1; then \
+		echo "ERROR: CSS is out of date. Run 'make css' to rebuild."; \
+		rm -f "$$TMP"; \
+		exit 1; \
+	fi; \
+	rm -f "$$TMP"; \
+	echo "CSS is up to date"
 
 # Clean build artifacts
 clean:

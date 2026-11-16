@@ -283,7 +283,7 @@ func (s *Server) buildStatusData() StatusData {
 		Tunnel: TunnelStatus{
 			Name:        snap.TunnelName,
 			ID:          snap.TunnelID,
-			Connections: 0,
+			Connections: snap.Connections,
 		},
 		Reconcile: ReconcileStatus{
 			Count:          snap.PassCount,

@@ -17,6 +17,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 25
+
       - name: Cache Go modules
         uses: actions/cache@v6.1.0
         with:
@@ -48,6 +53,9 @@ jobs:
 
       - name: Test
         run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Check CSS
+        run: make css-check
 
       - name: Upload coverage
         uses: codecov/codecov-action@v7.1.1
