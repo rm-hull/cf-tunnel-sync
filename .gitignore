@@ -33,6 +33,7 @@ go.work.sum
 # .idea/
 # .vscode/
 
+config.yaml
 testdata/state.json
 node_modules/
 package-lock.json
