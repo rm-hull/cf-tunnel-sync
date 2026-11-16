@@ -215,3 +215,76 @@ func TestRingBufferJSONOutput(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "test")
 }
+
+func TestRingBufferGroupValueExpanded(t *testing.T) {
+	var buf bytes.Buffer
+	jsonHandler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+
+	ring := logx.NewRingBufferHandler(10, jsonHandler)
+	logger := slog.New(ring)
+
+	// Log with a group attribute (simulates slog.Group("request", ...))
+	logger.Info("Incoming request",
+		slog.Group("request", "method", "GET", "path", "/api", "status", 200),
+		slog.Group("response", "latency", "3.5ms", "length", 1024),
+		"id", "abc-123",
+	)
+
+	records := ring.Records()
+	require.Len(t, records, 1)
+
+	var record map[string]any
+	require.NoError(t, json.Unmarshal(records[0], &record))
+
+	assert.Equal(t, "Incoming request", record["msg"])
+	assert.Equal(t, "abc-123", record["id"])
+
+	// request should be a flat map, not a group struct
+	request, ok := record["request"].(map[string]any)
+	require.True(t, ok, "request should be a map[string]any, got %T", record["request"])
+	assert.Equal(t, "GET", request["method"])
+	assert.Equal(t, "/api", request["path"])
+	assert.Equal(t, float64(200), request["status"])
+
+	// response should also be a flat map
+	response, ok := record["response"].(map[string]any)
+	require.True(t, ok, "response should be a map[string]any, got %T", record["response"])
+	assert.Equal(t, "3.5ms", response["latency"])
+	assert.Equal(t, float64(1024), response["length"])
+}
+
+func TestRingBufferNestedGroupValueExpanded(t *testing.T) {
+	var buf bytes.Buffer
+	jsonHandler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+
+	ring := logx.NewRingBufferHandler(10, jsonHandler)
+	logger := slog.New(ring)
+
+	// Log with nested group attributes
+	logger.Info("nested test",
+		slog.Group("outer",
+			"key1", "value1",
+			slog.Group("inner", "key2", "value2"),
+		),
+	)
+
+	records := ring.Records()
+	require.Len(t, records, 1)
+
+	var record map[string]any
+	require.NoError(t, json.Unmarshal(records[0], &record))
+
+	// outer should be a flat map
+	outer, ok := record["outer"].(map[string]any)
+	require.True(t, ok, "outer should be a map[string]any, got %T", record["outer"])
+	assert.Equal(t, "value1", outer["key1"])
+
+	// inner should be nested within outer as a map
+	inner, ok := outer["inner"].(map[string]any)
+	require.True(t, ok, "inner should be a map[string]any, got %T", outer["inner"])
+	assert.Equal(t, "value2", inner["key2"])
+}

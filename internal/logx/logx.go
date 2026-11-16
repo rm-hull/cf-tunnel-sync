@@ -57,7 +57,7 @@ func (h *RingBufferHandler) Handle(ctx context.Context, r slog.Record) error {
 		"msg":   r.Message,
 	}
 	for _, a := range entries {
-		record[a.Key] = a.Value.Any()
+		record[a.Key] = resolveValue(a.Value)
 	}
 
 	data, err := json.Marshal(record)
@@ -159,12 +159,52 @@ func ReplaceAttr(_ []string, a slog.Attr) slog.Attr {
 	return slog.Any(a.Key, processed)
 }
 
+// resolveValue converts an slog.Value to a Go value suitable for JSON marshaling.
+// It properly expands slog groups into a flat map[string]any.
+func resolveValue(v slog.Value) any {
+	switch v.Kind() {
+	case slog.KindGroup:
+		// This case handles groups from WithGroup() which produce KindGroup.
+		// v.Group() returns []slog.Attr for KindGroup.
+		result := make(map[string]any)
+		for _, a := range v.Any().([]slog.Attr) {
+			result[a.Key] = resolveValue(a.Value)
+		}
+		return result
+	case slog.KindDuration:
+		return v.Duration().String()
+	case slog.KindTime:
+		return v.Time()
+	case slog.KindString:
+		return v.String()
+	case slog.KindInt64:
+		return v.Int64()
+	case slog.KindUint64:
+		return v.Uint64()
+	case slog.KindFloat64:
+		return v.Float64()
+	case slog.KindBool:
+		return v.Bool()
+	default:
+		// slog.KindAny — resolve the inner value recursively
+		return processValue(v.Any())
+	}
+}
+
 // processValue recursively converts time.Duration values to their string
 // representation so they appear as human-readable durations in log output.
+// It also expands []slog.Attr (from slog.Group) into a flat map.
 func processValue(v any) any {
 	switch val := v.(type) {
 	case time.Duration:
 		return val.String()
+	case []slog.Attr:
+		// Expand slog.Group into a flat map
+		result := make(map[string]any, len(val))
+		for _, a := range val {
+			result[a.Key] = resolveValue(a.Value)
+		}
+		return result
 	case map[string]any:
 		newMap := make(map[string]any, len(val))
 		for k, v := range val {

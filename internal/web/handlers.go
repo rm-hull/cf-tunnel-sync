@@ -1,8 +1,11 @@
 package web
 
 import (
+	"fmt"
 	"html/template"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,6 +34,7 @@ func (s *Server) handleIndex(c *gin.Context) {
 		"formatDuration":  formatDuration,
 		"formatUptime":    formatUptime,
 		"formatTime":      formatTime,
+		"formatAttrs":     formatAttrs,
 		"statusClass":     statusClass,
 		"statusLabel":     statusLabel,
 		"last": func(n int, items []LogEvent) []LogEvent {
@@ -161,4 +165,55 @@ func statusLabel(status string) string {
 	default:
 		return status
 	}
+}
+
+// flattenAttrs recursively flattens nested maps and slices into dot-prefixed key-value pairs.
+func flattenAttrs(prefix string, v any, result map[string]string) {
+	switch val := v.(type) {
+	case map[string]any:
+		for k, v := range val {
+			flattenAttrs(prefix+k+".", v, result)
+		}
+	case []any:
+		for i, item := range val {
+			flattenAttrs(prefix+fmt.Sprintf("[%d]", i)+".", item, result)
+		}
+	default:
+		if prefix != "" {
+			result[strings.TrimSuffix(prefix, ".")] = fmt.Sprintf("%v", v)
+		}
+	}
+}
+
+// formatAttrs renders log event key-value attributes as HTML-safe, color-coded spans.
+// Nested maps are flattened with dot-prefixed keys (e.g. request.method=GET).
+// Keys are sorted alphabetically for consistent output.
+func formatAttrs(attrs map[string]any) template.HTML {
+	if len(attrs) == 0 {
+		return ""
+	}
+	flat := make(map[string]string)
+	for k, v := range attrs {
+		flattenAttrs(k+".", v, flat)
+	}
+	if len(flat) == 0 {
+		return ""
+	}
+	keys := slices.Sorted(maps.Keys(flat))
+	var b strings.Builder
+	b.WriteString(" ")
+	first := true
+	for _, k := range keys {
+		if !first {
+			b.WriteString(" ")
+		}
+		first = false
+		b.WriteString(`<span class="text-cyan-600 dark:text-cyan-400">`)
+		b.WriteString(template.HTMLEscapeString(k))
+		b.WriteString(`</span>=<span class="text-purple-600 dark:text-purple-400">`)
+		b.WriteString(template.HTMLEscapeString(flat[k]))
+		b.WriteString(`</span>`)
+	}
+	// #nosec G203 -- all dynamic content is escaped via template.HTMLEscapeString
+	return template.HTML(b.String())
 }

@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 
 @source "../templates";
+@source "../handlers.go";
 
 @theme {
   --color-paper: #eef1f0;
