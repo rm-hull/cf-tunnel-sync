@@ -1,0 +1,22 @@
+# Dockerfile.goreleaser — used by GoReleaser for multi-arch builds.
+# For local dev, use `make docker-build` which uses the Dockerfile below.
+FROM gcr.io/distroless/static:nonroot
+
+ARG TARGETPLATFORM
+
+ENV TZ=UTC
+
+WORKDIR /app
+
+# GoReleaser provides the pre-built binary under $TARGETPLATFORM/ in the build context
+COPY $TARGETPLATFORM/cf-tunnel-sync .
+
+USER nonroot:nonroot
+
+EXPOSE 8080/tcp
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["./cf-tunnel-sync", "healthcheck"]
+
+ENTRYPOINT ["./cf-tunnel-sync"]
+CMD ["run"]

@@ -1,4 +1,4 @@
-.PHONY: all build test lint ci tools css css-check clean
+.PHONY: all build test lint ci tools css css-check clean docker-build goreleaser-snapshot
 
 # Default target
 all: build
@@ -71,3 +71,11 @@ css-check: npm-install
 # Clean build artifacts
 clean:
 	rm -rf bin/
+
+# Build Docker image (local dev, multi-stage)
+docker-build:
+	docker build -t cf-tunnel-sync:test .
+
+# GoReleaser snapshot build (local dry-run)
+goreleaser-snapshot:
+	goreleaser release --snapshot --clean

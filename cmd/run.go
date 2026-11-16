@@ -13,6 +13,7 @@ import (
 	"github.com/rm-hull/cf-tunnel-sync/internal/logx"
 	"github.com/rm-hull/cf-tunnel-sync/internal/reconcile"
 	"github.com/rm-hull/cf-tunnel-sync/internal/web"
+	"github.com/rm-hull/godx"
 	"github.com/spf13/cobra"
 )
 
@@ -30,6 +31,8 @@ func NewRunCmd() *cobra.Command {
 
 			logLevel := logx.ParseLogLevel(cfg.Server.LogLevel)
 			log, ring := logx.NewJSONLogger(logLevel, 1000)
+
+			godx.Diagnostics(log)
 
 			dockerAPI, err := docker.New(cfg.Docker.Host, log)
 			if err != nil {

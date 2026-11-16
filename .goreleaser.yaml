@@ -1,0 +1,59 @@
+version: 2
+project_name: cf-tunnel-sync
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    main: .
+    binary: cf-tunnel-sync
+    ldflags:
+      - "-s -w -X main.version={{ .Version }} -X main.commit={{ .FullCommit }}"
+
+dockers_v2:
+  - dockerfile: Dockerfile.goreleaser
+    images:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}"
+    tags:
+      - "{{ .Version }}"
+      - "latest"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      "org.opencontainers.image.title": "{{ .ProjectName }}"
+      "org.opencontainers.image.description": "Keep Cloudflare Tunnel ingress rules in sync with Docker labels"
+      "org.opencontainers.image.version": "{{ .Version }}"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.source": "https://github.com/{{ .Env.IMAGE_NAME }}"
+      "org.opencontainers.image.url": "https://github.com/{{ .Env.IMAGE_NAME }}"
+
+release:
+  github:
+    owner: rm-hull
+    name: cf-tunnel-sync
+  prerelease: auto
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 100
+    - title: "Bug fixes"
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 200
+    - title: Others
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"

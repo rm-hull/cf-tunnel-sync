@@ -1,0 +1,90 @@
+name: Build and Test
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 25
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Cache Go modules & tools
+        uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/go/bin
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Check module tidy
+        run: go mod tidy && git diff --exit-code go.mod go.sum
+
+      - name: Format check
+        run: |
+          go fmt ./...
+          git diff --exit-code
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9.3.0
+
+      - name: Test
+        run: |
+          export PATH=$(go env GOPATH)/bin:$PATH
+          go install gotest.tools/gotestsum@latest
+          mkdir -p ./test-reports/
+          gotestsum --junitfile=./test-reports/junit.xml --format github-actions -- -v -race -coverprofile=profile.cov -coverpkg=./... ./...
+
+      - name: Collect test results
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: test-reports
+          path: ./test-reports/
+
+      - name: Publish test results
+        uses: mikepenz/action-junit-report@v6.7.1
+        if: always()
+        with:
+          report_paths: "./test-reports/junit.xml"
+          comment: true
+          include_passed: true
+          detailed_summary: true
+
+      - name: Upload coverage to Coveralls
+        uses: shogo82148/actions-goveralls@v1.11.5
+        continue-on-error: true
+        with:
+          path-to-profile: profile.cov
+
+      - name: Check CSS
+        run: make css-check
