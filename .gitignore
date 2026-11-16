@@ -34,3 +34,5 @@ go.work.sum
 # .vscode/
 
 testdata/state.json
+node_modules/
+package-lock.json

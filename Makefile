@@ -42,15 +42,24 @@ tools:
 	fi
 	# Install gofumpt
 	go install mvdan.cc/gofumpt@latest
+	# Install Node.js dependencies (Tailwind CSS)
+	# Requires Node.js: brew install node (macOS) or sudo apt install nodejs npm (Ubuntu)
+	npm install
 
 # Generate CSS from Tailwind source (uses npx with pinned version)
 css:
-	npx @tailwindcss/cli -i internal/web/assets/tailwind.css -o internal/web/static/app.css --minify
+	@VERSION=$$(cat tools/tailwind.version); \
+	npx @tailwindcss/cli@$$VERSION -i internal/web/assets/tailwind.css -o internal/web/static/app.css --minify
+
+# Install npm dependencies (Tailwind CSS)
+npm-install:
+	npm install
 
 # Check CSS is up to date
-css-check:
-	@TMP=$$(mktemp); \
-	npx @tailwindcss/cli -i internal/web/assets/tailwind.css -o "$$TMP" --minify 2>/dev/null; \
+css-check: npm-install
+	@VERSION=$$(cat tools/tailwind.version); \
+	TMP=$$(mktemp); \
+	npx @tailwindcss/cli@$$VERSION -i internal/web/assets/tailwind.css -o "$$TMP" --minify 2>/dev/null; \
 	if ! diff -q internal/web/static/app.css "$$TMP" >/dev/null 2>&1; then \
 		echo "ERROR: CSS is out of date. Run 'make css' to rebuild."; \
 		rm -f "$$TMP"; \

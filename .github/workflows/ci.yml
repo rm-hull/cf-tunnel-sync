@@ -22,6 +22,9 @@ jobs:
         with:
           node-version: 25
 
+      - name: Install npm dependencies
+        run: npm install
+
       - name: Cache Go modules
         uses: actions/cache@v6.1.0
         with:
