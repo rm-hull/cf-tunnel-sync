@@ -42,7 +42,8 @@ type API interface {
 	// It lists containers per prefix, merges by ID, and parses labels.
 	DesiredRules(ctx context.Context, prefixes []string, allowUnprotected bool) (map[string]labels.Rule, []labels.Issue, error)
 
-	// Events subscribes to container events (start/die/stop/destroy).
+	// Events subscribes to container events (start/die).
+	// Only these two actions change the set of running containers that matter for tunnel rules.
 	Events(ctx context.Context, prefixes []string) EventStream
 
 	// --- Stubbed for S8 (cloudflared lifecycle) ---

@@ -40,7 +40,7 @@ func EnsureCloudflared(ctx context.Context, api API, cfAPI cf.API,
 	if existing.ID != "" {
 		switch existing.State {
 		case "running":
-			log.Info("cloudflared container is running, adopting", "id", existing.ID, "name", existing.Name)
+			log.Debug("cloudflared container is running, adopting", "id", existing.ID, "name", existing.Name)
 			if existing.Network != cfg.Network {
 				log.Warn("cloudflared container on wrong network",
 					"expected", cfg.Network, "actual", existing.Network)
@@ -52,7 +52,7 @@ func EnsureCloudflared(ctx context.Context, api API, cfAPI cf.API,
 				log.Info("would_start_cloudflared", "id", existing.ID)
 				return nil
 			}
-			log.Info("starting stopped cloudflared container", "id", existing.ID)
+			log.Info("restarting existing cloudflared container", "id", existing.ID, "name", existing.Name)
 			if err := api.StartContainer(ctx, existing.ID); err != nil {
 				// The container may be stale (eg its network was removed).
 				// Remove it and recreate from scratch.

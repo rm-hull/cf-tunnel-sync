@@ -799,7 +799,7 @@ func TestReconcile_rule_changes(t *testing.T) {
 	res2 := eng.Run(ctx)
 	require.NoError(t, res2.LastError)
 	assert.Equal(t, 1, res2.RulesAdded)
-	assert.Equal(t, 1, res2.RulesUpdated)
+	assert.Equal(t, 0, res2.RulesUpdated) // whoami unchanged, only vault is new
 
 	dockerAPI = setupFakeDocker(t, vault)
 	eng = newEngine(t, dockerAPI, cfAPI, statePath)

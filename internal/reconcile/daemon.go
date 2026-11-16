@@ -265,18 +265,28 @@ func (d *Daemon) runPass(ctx context.Context) {
 			d.Trigger()
 		})
 	} else {
-		d.log.Info("reconcile pass complete",
-			"active", res.RulesActive,
-			"added", res.RulesAdded,
-			"updated", res.RulesUpdated,
-			"pending", res.RulesPending,
-			"expired", res.RulesExpired,
-			"conflict", res.RulesConflict,
-			"dns_created", res.DNSCreated,
-			"dns_updated", res.DNSUpdated,
-			"ingress_updated", res.IngressUpdated,
-			"duration", duration,
-		)
+		// Log at INFO only when something changed, DEBUG otherwise
+		hasChanges := res.RulesAdded > 0 || res.RulesUpdated > 0 || res.DNSCreated > 0 ||
+			res.DNSUpdated > 0 || res.IngressUpdated
+		if hasChanges {
+			d.log.Info("reconcile pass complete",
+				"active", res.RulesActive,
+				"added", res.RulesAdded,
+				"updated", res.RulesUpdated,
+				"pending", res.RulesPending,
+				"expired", res.RulesExpired,
+				"conflict", res.RulesConflict,
+				"dns_created", res.DNSCreated,
+				"dns_updated", res.DNSUpdated,
+				"ingress_updated", res.IngressUpdated,
+				"duration", duration,
+			)
+		} else {
+			d.log.Debug("reconcile pass complete (no changes)",
+				"active", res.RulesActive,
+				"duration", duration,
+			)
+		}
 	}
 }
 

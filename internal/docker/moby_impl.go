@@ -133,9 +133,12 @@ func (a *mobyAPI) Events(ctx context.Context, _ []string) EventStream {
 	errCh := make(chan error)
 
 	// Build event filters for container actions.
+	// Only "start" and "die" matter: they change the set of running containers
+	// that DesiredRules queries. "stop" and "destroy" are redundant — "die" fires
+	// when a container exits, and DesiredRules only lists running containers.
 	filters := mobyclient.Filters{}
 	filters = filters.Add("type", "container")
-	filters = filters.Add("action", "start", "die", "stop", "destroy")
+	filters = filters.Add("action", "start", "die")
 
 	a.log.Debug("starting Docker events subscription", "filters", filters)
 

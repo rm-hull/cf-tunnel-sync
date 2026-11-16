@@ -158,10 +158,10 @@ func (e *Engine) Run(ctx context.Context) Result {
 	desired := e.convertDesired(desiredLabels)
 
 	// Count added vs updated before Apply() modifies state
-	for key := range desired {
-		if _, exists := st.Rules[key]; !exists {
+	for key, d := range desired {
+		if existing, exists := st.Rules[key]; !exists {
 			res.RulesAdded++
-		} else {
+		} else if rulesChanged(existing, d) {
 			res.RulesUpdated++
 		}
 	}
@@ -236,20 +236,29 @@ func (e *Engine) Run(ctx context.Context) Result {
 	duration := time.Since(start)
 	res.Duration = duration
 
-	// 10. Log summary
-	e.log.Info("reconcile done",
-		"active", res.RulesActive,
-		"added", res.RulesAdded,
-		"updated", res.RulesUpdated,
-		"pending", res.RulesPending,
-		"expired", res.RulesExpired,
-		"conflict", res.RulesConflict,
-		"dns_created", res.DNSCreated,
-		"dns_updated", res.DNSUpdated,
-		"ingress_updated", res.IngressUpdated,
-		"dry_run", res.DryRun,
-		"duration", duration,
-	)
+	// 10. Log summary — INFO only when something changed, DEBUG otherwise
+	hasChanges := res.RulesAdded > 0 || res.RulesUpdated > 0 || res.DNSCreated > 0 ||
+		res.DNSUpdated > 0 || res.IngressUpdated
+	if hasChanges {
+		e.log.Info("reconcile done",
+			"active", res.RulesActive,
+			"added", res.RulesAdded,
+			"updated", res.RulesUpdated,
+			"pending", res.RulesPending,
+			"expired", res.RulesExpired,
+			"conflict", res.RulesConflict,
+			"dns_created", res.DNSCreated,
+			"dns_updated", res.DNSUpdated,
+			"ingress_updated", res.IngressUpdated,
+			"dry_run", res.DryRun,
+			"duration", duration,
+		)
+	} else {
+		e.log.Debug("reconcile done (no changes)",
+			"active", res.RulesActive,
+			"duration", duration,
+		)
+	}
 
 	return res
 }
@@ -392,6 +401,15 @@ func (e *Engine) deleteDNSIfOrphaned(ctx context.Context, tunnelID string, rule 
 			}
 		}
 	}
+}
+
+// rulesChanged returns true if the desired rule differs from the existing rule
+// in any field that affects the tunnel configuration (excluding lifecycle fields).
+func rulesChanged(existing, desired rules.Rule) bool {
+	return existing.Service != desired.Service ||
+		existing.NoTLSVerify != desired.NoTLSVerify ||
+		existing.OriginServerName != desired.OriginServerName ||
+		existing.ZoneName != desired.ZoneName
 }
 
 // convertDesired converts labels.Rule map to rules.Rule map.
