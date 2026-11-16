@@ -24,6 +24,8 @@ type Result struct {
 	RulesUpdated   int
 	RulesPending   int
 	RulesExpired   int
+	RulesActive    int
+	RulesConflict  int
 	DNSCreated     int
 	DNSUpdated     int
 	DNSDeleted     int
@@ -167,6 +169,7 @@ func (e *Engine) Run(ctx context.Context) Result {
 	// 4. Apply lifecycle
 	now := time.Now()
 	st, active, pending, expired := rules.Apply(st, desired, now, e.grace)
+	res.RulesActive = len(active)
 	res.RulesPending = len(pending)
 	res.RulesExpired = len(expired)
 
@@ -199,6 +202,7 @@ func (e *Engine) Run(ctx context.Context) Result {
 			continue
 		}
 		if hasConflict {
+			res.RulesConflict++
 			if stRule, ok := st.Rules[key]; ok {
 				stRule.Status = "dns_conflict"
 				st.Rules[key] = stRule
@@ -234,10 +238,12 @@ func (e *Engine) Run(ctx context.Context) Result {
 
 	// 10. Log summary
 	e.log.Info("reconcile done",
+		"active", res.RulesActive,
 		"added", res.RulesAdded,
 		"updated", res.RulesUpdated,
 		"pending", res.RulesPending,
 		"expired", res.RulesExpired,
+		"conflict", res.RulesConflict,
 		"dns_created", res.DNSCreated,
 		"dns_updated", res.DNSUpdated,
 		"ingress_updated", res.IngressUpdated,

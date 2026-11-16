@@ -291,12 +291,16 @@ func Test_metrics_enabled(t *testing.T) {
 	body := rec.Body.String()
 
 	// Verify custom metrics are present
-	assert.Contains(t, body, "cftunnelsync_tunnel_pass_count_total")
-	assert.Contains(t, body, "cftunnelsync_tunnel_last_pass_duration_seconds")
-	assert.Contains(t, body, "cftunnelsync_tunnel_last_error")
-	assert.Contains(t, body, "cftunnelsync_tunnel_cf_api_calls_total")
-	assert.Contains(t, body, "cftunnelsync_tunnel_cf_api_errors_total")
-	assert.Contains(t, body, "cftunnelsync_tunnel_docker_events_total")
+	assert.Contains(t, body, "cftunnelsync_reconciler_pass_count_total")
+	assert.Contains(t, body, "cftunnelsync_reconciler_last_pass_duration_seconds")
+	assert.Contains(t, body, "cftunnelsync_reconciler_last_error")
+	assert.Contains(t, body, "cftunnelsync_rules_active")
+	assert.Contains(t, body, "cftunnelsync_rules_pending")
+	assert.Contains(t, body, "cftunnelsync_rules_expired")
+	assert.Contains(t, body, "cftunnelsync_rules_conflict")
+	assert.Contains(t, body, "cftunnelsync_cf_api_calls_total")
+	assert.Contains(t, body, "cftunnelsync_cf_api_errors_total")
+	assert.Contains(t, body, "cftunnelsync_docker_events_total")
 
 	// Verify default Go/runtime metrics are also present
 	assert.Contains(t, body, "go_goroutines")

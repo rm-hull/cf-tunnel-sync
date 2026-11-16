@@ -7,6 +7,8 @@ import (
 	"github.com/rm-hull/cf-tunnel-sync/internal/reconcile"
 )
 
+const namespace = "cftunnelsync"
+
 // daemonCollector collects metrics from the daemon's Snapshot.
 type daemonCollector struct {
 	daemon *reconcile.Daemon
@@ -14,6 +16,10 @@ type daemonCollector struct {
 	descPassCount       *prometheus.Desc
 	descLastDuration    *prometheus.Desc
 	descLastError       *prometheus.Desc
+	descRulesActive     *prometheus.Desc
+	descRulesPending    *prometheus.Desc
+	descRulesExpired    *prometheus.Desc
+	descRulesConflict   *prometheus.Desc
 	descCFAPICalls      *prometheus.Desc
 	descCFAPIErrors     *prometheus.Desc
 	descCFAPICallsByRes *prometheus.Desc
@@ -22,46 +28,65 @@ type daemonCollector struct {
 }
 
 func newDaemonCollector(daemon *reconcile.Daemon) *daemonCollector {
-	subsystem := "tunnel"
 	return &daemonCollector{
 		daemon: daemon,
 		descPassCount: prometheus.NewDesc(
-			prometheus.BuildFQName("cftunnelsync", subsystem, "pass_count_total"),
+			prometheus.BuildFQName(namespace, "reconciler", "pass_count_total"),
 			"Total number of reconciliation passes completed.",
 			nil, nil,
 		),
 		descLastDuration: prometheus.NewDesc(
-			prometheus.BuildFQName("cftunnelsync", subsystem, "last_pass_duration_seconds"),
+			prometheus.BuildFQName(namespace, "reconciler", "last_pass_duration_seconds"),
 			"Duration of the last reconciliation pass in seconds.",
 			nil, nil,
 		),
 		descLastError: prometheus.NewDesc(
-			prometheus.BuildFQName("cftunnelsync", subsystem, "last_error"),
+			prometheus.BuildFQName(namespace, "reconciler", "last_error"),
 			"Whether the last reconciliation pass had an error (1=yes, 0=no).",
 			nil, nil,
 		),
 		descCFAPICalls: prometheus.NewDesc(
-			prometheus.BuildFQName("cftunnelsync", subsystem, "cf_api_calls_total"),
+			prometheus.BuildFQName(namespace, "cf_api", "calls_total"),
 			"Total Cloudflare API calls.",
 			nil, nil,
 		),
 		descCFAPIErrors: prometheus.NewDesc(
-			prometheus.BuildFQName("cftunnelsync", subsystem, "cf_api_errors_total"),
+			prometheus.BuildFQName(namespace, "cf_api", "errors_total"),
 			"Total Cloudflare API errors.",
 			nil, nil,
 		),
 		descCFAPICallsByRes: prometheus.NewDesc(
-			prometheus.BuildFQName("cftunnelsync", subsystem, "cf_api_calls_by_resource_total"),
+			prometheus.BuildFQName(namespace, "cf_api", "calls_by_resource_total"),
 			"Cloudflare API calls by resource type.",
 			[]string{"resource"}, nil,
 		),
+		descRulesActive: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "rules", "active"),
+			"Number of active rules.",
+			nil, nil,
+		),
+		descRulesPending: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "rules", "pending"),
+			"Number of pending rules (within grace period).",
+			nil, nil,
+		),
+		descRulesExpired: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "rules", "expired"),
+			"Number of expired rules (grace period elapsed).",
+			nil, nil,
+		),
+		descRulesConflict: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "rules", "conflict"),
+			"Number of rules with DNS conflicts.",
+			nil, nil,
+		),
 		descEventCount: prometheus.NewDesc(
-			prometheus.BuildFQName("cftunnelsync", subsystem, "docker_events_total"),
+			prometheus.BuildFQName(namespace, "docker", "events_total"),
 			"Total Docker events received.",
 			nil, nil,
 		),
 		descTunnelID: prometheus.NewDesc(
-			prometheus.BuildFQName("cftunnelsync", subsystem, "tunnel_id"),
+			prometheus.BuildFQName(namespace, "tunnel", "id"),
 			"Current tunnel ID as a label-gauge.",
 			[]string{"id", "name"}, nil,
 		),
@@ -74,6 +99,10 @@ func (c *daemonCollector) Describe(ch chan<- *prometheus.Desc) {
 		c.descPassCount,
 		c.descLastDuration,
 		c.descLastError,
+		c.descRulesActive,
+		c.descRulesPending,
+		c.descRulesExpired,
+		c.descRulesConflict,
 		c.descCFAPICalls,
 		c.descCFAPIErrors,
 		c.descCFAPICallsByRes,
@@ -96,6 +125,11 @@ func (c *daemonCollector) Collect(ch chan<- prometheus.Metric) {
 		hasError = 1.0
 	}
 	ch <- prometheus.MustNewConstMetric(c.descLastError, prometheus.GaugeValue, hasError)
+
+	ch <- prometheus.MustNewConstMetric(c.descRulesActive, prometheus.GaugeValue, float64(snap.RulesActive))
+	ch <- prometheus.MustNewConstMetric(c.descRulesPending, prometheus.GaugeValue, float64(snap.RulesPending))
+	ch <- prometheus.MustNewConstMetric(c.descRulesExpired, prometheus.GaugeValue, float64(snap.RulesExpired))
+	ch <- prometheus.MustNewConstMetric(c.descRulesConflict, prometheus.GaugeValue, float64(snap.RulesConflict))
 
 	ch <- prometheus.MustNewConstMetric(c.descCFAPICalls, prometheus.CounterValue, float64(snap.CFStats.Calls))
 	ch <- prometheus.MustNewConstMetric(c.descCFAPIErrors, prometheus.CounterValue, float64(snap.CFStats.Errors))

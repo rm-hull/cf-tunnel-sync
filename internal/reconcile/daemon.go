@@ -21,13 +21,17 @@ type DaemonConfig struct {
 
 // Snapshot holds the current state of the daemon for status reporting.
 type Snapshot struct {
-	TunnelID     string
-	TunnelName   string
-	PassCount    int
-	LastDuration time.Duration
-	LastError    error
-	CFStats      cf.Stats
-	EventCount   int
+	TunnelID      string
+	TunnelName    string
+	PassCount     int
+	LastDuration  time.Duration
+	LastError     error
+	RulesActive   int
+	RulesPending  int
+	RulesExpired  int
+	RulesConflict int
+	CFStats       cf.Stats
+	EventCount    int
 }
 
 // Daemon orchestrates the event-driven reconciliation loop.
@@ -225,6 +229,10 @@ func (d *Daemon) runPass(ctx context.Context) {
 	d.snap.PassCount++
 	d.snap.LastDuration = duration
 	d.snap.LastError = res.LastError
+	d.snap.RulesActive = res.RulesActive
+	d.snap.RulesPending = res.RulesPending
+	d.snap.RulesExpired = res.RulesExpired
+	d.snap.RulesConflict = res.RulesConflict
 	if res.Tunnel.ID != "" {
 		d.snap.TunnelID = res.Tunnel.ID
 		d.snap.TunnelName = res.Tunnel.Name
@@ -246,10 +254,12 @@ func (d *Daemon) runPass(ctx context.Context) {
 		})
 	} else {
 		d.log.Info("reconcile pass complete",
+			"active", res.RulesActive,
 			"added", res.RulesAdded,
 			"updated", res.RulesUpdated,
 			"pending", res.RulesPending,
 			"expired", res.RulesExpired,
+			"conflict", res.RulesConflict,
 			"dns_created", res.DNSCreated,
 			"dns_updated", res.DNSUpdated,
 			"ingress_updated", res.IngressUpdated,
