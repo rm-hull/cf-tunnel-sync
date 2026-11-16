@@ -115,11 +115,6 @@ func (d *Daemon) Snapshot() Snapshot {
 // Run starts the daemon loop. It blocks until ctx is cancelled.
 // On cancellation, it waits for any in-progress pass to complete before returning.
 func (d *Daemon) Run(ctx context.Context) {
-	d.log.Info("daemon starting",
-		"debounce", d.cfg.Debounce,
-		"resync_interval", d.cfg.ResyncInterval,
-	)
-
 	// Start Docker event stream
 	stream := d.dockerAPI.Events(ctx, nil)
 
@@ -256,6 +251,7 @@ func (d *Daemon) runPass(ctx context.Context) {
 			"pending", res.RulesPending,
 			"expired", res.RulesExpired,
 			"dns_created", res.DNSCreated,
+			"dns_updated", res.DNSUpdated,
 			"ingress_updated", res.IngressUpdated,
 			"duration", duration,
 		)

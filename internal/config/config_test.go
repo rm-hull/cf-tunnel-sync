@@ -16,11 +16,11 @@ import (
 func TestDefaults(t *testing.T) {
 	cfg := config.Defaults()
 
-	assert.Equal(t, ":5000", cfg.Server.Listen)
+	assert.Equal(t, ":8080", cfg.Server.Listen)
 	assert.Equal(t, "INFO", cfg.Server.LogLevel)
 	assert.Equal(t, "json", cfg.Server.LogFormat)
 	assert.Equal(t, "/data/state.json", cfg.Server.StatePath)
-	assert.Equal(t, "15s", cfg.Server.StatusRefresh)
+	assert.Equal(t, 15*time.Second, cfg.Server.StatusRefresh)
 	assert.False(t, cfg.Server.Metrics)
 	assert.False(t, cfg.Server.DryRun)
 
@@ -43,7 +43,7 @@ func TestDiscovery_order(t *testing.T) {
 	// Test that --config flag takes precedence
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
-	require.NoError(t, os.WriteFile(configPath, []byte("server:\n  listen: \":5000\"\n"), 0o600))
+	require.NoError(t, os.WriteFile(configPath, []byte("server:\n  listen: \":8080\"\n"), 0o600))
 
 	path, searched, err := config.Discover(configPath)
 	require.NoError(t, err)

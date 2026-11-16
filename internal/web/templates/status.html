@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cf-tunnel-sync status</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="bg-paper dark:bg-night text-ink dark:text-snow min-h-screen">
+  <div class="max-w-6xl mx-auto p-4 sm:p-6">
+    <h1 class="text-xl font-semibold mb-4">cf-tunnel-sync</h1>
+
+    <!-- Status sentence -->
+    <p class="text-lg mb-6">{{healthySentence .}}</p>
+
+    <!-- Stats strip -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div class="p-3 rounded bg-gray-100 dark:bg-gray-800">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Connections</div>
+        <div class="text-2xl font-bold">{{.Tunnel.Connections}}</div>
+      </div>
+      <div class="p-3 rounded bg-gray-100 dark:bg-gray-800">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Last reconcile</div>
+        <div class="text-lg font-bold">{{.Reconcile.LastDurationMs}}ms</div>
+      </div>
+      <div class="p-3 rounded bg-gray-100 dark:bg-gray-800">
+        <div class="text-sm text-gray-500 dark:text-gray-400">API calls</div>
+        <div class="text-2xl font-bold">{{.CloudflareAPI.Calls}}</div>
+      </div>
+      <div class="p-3 rounded bg-gray-100 dark:bg-gray-800">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Docker events</div>
+        <div class="text-2xl font-bold">{{.Docker.EventsReceived}}</div>
+      </div>
+    </div>
+
+    <!-- Rules table -->
+    <h2 class="text-lg font-semibold mb-3">Routes</h2>
+    {{if .Rules}}
+    <div class="overflow-x-auto mb-6">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-300 dark:border-gray-600">
+            <th class="text-left py-2 px-3">Hostname</th>
+            <th class="text-left py-2 px-3">Service</th>
+            <th class="text-left py-2 px-3">Container</th>
+            <th class="text-left py-2 px-3">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Rules}}
+          <tr class="border-b border-gray-200 dark:border-gray-700">
+            <td class="py-2 px-3 font-mono">{{.Hostname}}{{if .Path}}<span class="text-gray-500">/{{.Path}}</span>{{end}}</td>
+            <td class="py-2 px-3 font-mono text-xs">{{.Service}}</td>
+            <td class="py-2 px-3">{{.Container}}</td>
+            <td class="py-2 px-3">
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-medium
+                {{if eq (statusClass .Status) "ok"}}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                {{else if eq (statusClass .Status) "warn"}}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                {{else if eq (statusClass .Status) "bad"}}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+                {{else}}bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200{{end}}">
+                {{statusLabel .Status}}
+              </span>
+              {{if .PendingRemovalText}}
+              <span class="text-xs text-gray-500 ml-2">{{.PendingRemovalText}}</span>
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+    <p class="text-gray-500 mb-6">No routes configured.</p>
+    {{end}}
+
+    <!-- Orphan DNS -->
+    {{if .OrphanDNS}}
+    <h2 class="text-lg font-semibold mb-3">Orphan DNS records</h2>
+    <ul class="list-disc list-inside mb-6 text-sm text-gray-600 dark:text-gray-400">
+      {{range .OrphanDNS}}
+      <li class="font-mono">{{.}}</li>
+      {{end}}
+    </ul>
+    {{end}}
+
+    <!-- Label warnings -->
+    {{if .LabelWarnings}}
+    <h2 class="text-lg font-semibold mb-3">Label warnings</h2>
+    <ul class="list-disc list-inside mb-6 text-sm text-yellow-600 dark:text-yellow-400">
+      {{range .LabelWarnings}}
+      <li>{{.Container}}: {{.Detail}}</li>
+      {{end}}
+    </ul>
+    {{end}}
+
+    <!-- Recent events -->
+    {{if .RecentEvents}}
+    <h2 class="text-lg font-semibold mb-3">Recent events</h2>
+    <div class="text-xs font-mono space-y-1 mb-6 text-gray-600 dark:text-gray-400">
+      {{range last 20 .RecentEvents}}
+      <div>{{.Time}} [{{.Level}}] {{.Msg}}</div>
+      {{end}}
+    </div>
+    {{end}}
+
+    {{if .DryRun}}
+    <div class="mt-4 p-3 rounded bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 text-sm">
+      Running in dry-run mode. No changes are being made.
+    </div>
+    {{end}}
+  </div>
+</body>
+</html>

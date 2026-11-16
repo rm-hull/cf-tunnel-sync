@@ -120,6 +120,10 @@ type API interface {
 	// In read-only mode, returns ErrReadOnly.
 	CreateDNSRecord(ctx context.Context, record DNSRecord) (string, error)
 
+	// UpdateDNSRecord updates an existing DNS record.
+	// In read-only mode, returns ErrReadOnly.
+	UpdateDNSRecord(ctx context.Context, record DNSRecord) error
+
 	// DeleteDNSRecord deletes a DNS record.
 	// In read-only mode, returns ErrReadOnly.
 	DeleteDNSRecord(ctx context.Context, recordID string) error

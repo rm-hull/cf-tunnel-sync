@@ -354,6 +354,30 @@ func (s *sdkAPI) CreateDNSRecord(ctx context.Context, record DNSRecord) (string,
 	return r.ID, nil
 }
 
+// UpdateDNSRecord updates an existing DNS record.
+func (s *sdkAPI) UpdateDNSRecord(ctx context.Context, record DNSRecord) error {
+	s.inc("dns")
+	s.log.Debug("update DNS record", "id", record.ID, "name", record.Name, "content", record.Content)
+	rc := cfdns.ZoneIdentifier(record.ZoneID)
+	proxied := record.Proxied
+	ttl := 1 // auto
+	_, updateErr := s.cf.UpdateDNSRecord(ctx, rc, cfdns.UpdateDNSRecordParams{
+		ID:      record.ID,
+		Type:    record.Type,
+		Name:    record.Name,
+		Content: record.Content,
+		Proxied: &proxied,
+		TTL:     ttl,
+	})
+	if updateErr != nil {
+		s.incErr("dns")
+		s.log.Debug("update DNS record failed", "id", record.ID, "error", updateErr)
+		return fmt.Errorf("update DNS record: %w", updateErr)
+	}
+	s.log.Debug("updated DNS record", "id", record.ID, "name", record.Name)
+	return nil
+}
+
 // DeleteDNSRecord deletes a DNS record.
 func (s *sdkAPI) DeleteDNSRecord(ctx context.Context, recordID string) error {
 	s.inc("dns")

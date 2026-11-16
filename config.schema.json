@@ -22,7 +22,7 @@
       "properties": {
         "listen": {
           "type": "string",
-          "description": "HTTP listen address for the status page (e.g., :5000)."
+          "description": "HTTP listen address for the status page (e.g., :8080)."
         },
         "log_level": {
           "type": "string",
@@ -37,8 +37,10 @@
           "description": "File path for persistent state (JSON)."
         },
         "status_refresh": {
+          "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
           "type": "string",
-          "description": "Meta-refresh interval for the status page; 0 disables auto-refresh."
+          "description": "Meta-refresh interval for the status page; 0 disables auto-refresh.",
+          "format": "duration"
         },
         "metrics": {
           "type": "boolean",
@@ -288,7 +290,7 @@
           "properties": {
             "listen": {
               "type": "string",
-              "description": "HTTP listen address for the status page (e.g., :5000)."
+              "description": "HTTP listen address for the status page (e.g., :8080)."
             },
             "log_level": {
               "type": "string",
@@ -303,8 +305,10 @@
               "description": "File path for persistent state (JSON)."
             },
             "status_refresh": {
+              "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
               "type": "string",
-              "description": "Meta-refresh interval for the status page; 0 disables auto-refresh."
+              "description": "Meta-refresh interval for the status page; 0 disables auto-refresh.",
+              "format": "duration"
             },
             "metrics": {
               "type": "boolean",
@@ -570,7 +574,7 @@
       "properties": {
         "listen": {
           "type": "string",
-          "description": "HTTP listen address for the status page (e.g., :5000)."
+          "description": "HTTP listen address for the status page (e.g., :8080)."
         },
         "log_level": {
           "type": "string",
@@ -585,8 +589,10 @@
           "description": "File path for persistent state (JSON)."
         },
         "status_refresh": {
+          "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
           "type": "string",
-          "description": "Meta-refresh interval for the status page; 0 disables auto-refresh."
+          "description": "Meta-refresh interval for the status page; 0 disables auto-refresh.",
+          "format": "duration"
         },
         "metrics": {
           "type": "boolean",

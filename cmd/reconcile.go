@@ -52,6 +52,7 @@ func NewReconcileCmd() *cobra.Command {
 				cfg.Reconcile.GracePeriod,
 				reconcile.WithDryRun(dryRun || cfg.Server.DryRun),
 				reconcile.WithCloudflared(cfg.Tunnel.Cloudflared, cfg.Tunnel.ExternalID),
+				reconcile.WithOverwriteConflicts(cfg.DNS.OverwriteConflicts),
 			)
 
 			res := eng.Run(cmd.Context())
@@ -63,9 +64,9 @@ func NewReconcileCmd() *cobra.Command {
 			if res.DryRun {
 				mode = "dry-run"
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Reconcile %s: added=%d updated=%d pending=%d expired=%d dns_created=%d ingress_updated=%v (%v)\n",
+			fmt.Fprintf(cmd.OutOrStdout(), "Reconcile %s: added=%d updated=%d pending=%d expired=%d dns_created=%d dns_updated=%d ingress_updated=%v (%v)\n",
 				mode, res.RulesAdded, res.RulesUpdated, res.RulesPending, res.RulesExpired,
-				res.DNSCreated, res.IngressUpdated, res.Duration)
+				res.DNSCreated, res.DNSUpdated, res.IngressUpdated, res.Duration)
 
 			return nil
 		},

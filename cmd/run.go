@@ -5,12 +5,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/cf"
 	"github.com/rm-hull/cf-tunnel-sync/internal/config"
 	"github.com/rm-hull/cf-tunnel-sync/internal/docker"
 	"github.com/rm-hull/cf-tunnel-sync/internal/logx"
 	"github.com/rm-hull/cf-tunnel-sync/internal/reconcile"
+	"github.com/rm-hull/cf-tunnel-sync/internal/web"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +30,6 @@ func NewRunCmd() *cobra.Command {
 
 			logLevel := logx.ParseLogLevel(cfg.Server.LogLevel)
 			log, ring := logx.NewJSONLogger(logLevel, 1000)
-			_ = ring // will be used by S10 web status page
 
 			dockerAPI, err := docker.New(cfg.Docker.Host, log)
 			if err != nil {
@@ -50,6 +51,7 @@ func NewRunCmd() *cobra.Command {
 				cfg.Reconcile.GracePeriod,
 				reconcile.WithDryRun(dryRun || cfg.Server.DryRun),
 				reconcile.WithCloudflared(cfg.Tunnel.Cloudflared, cfg.Tunnel.ExternalID),
+				reconcile.WithOverwriteConflicts(cfg.DNS.OverwriteConflicts),
 			)
 
 			daemon := reconcile.NewDaemon(
@@ -65,6 +67,15 @@ func NewRunCmd() *cobra.Command {
 				cfg.Tunnel.ExternalID,
 				dryRun || cfg.Server.DryRun,
 			)
+
+			// Create web server
+			webServer := web.NewServer(log, daemon, ring, cfAPI, cfg.Server.StatePath, web.Config{
+				Listen:         cfg.Server.Listen,
+				Metrics:        cfg.Server.Metrics,
+				StatusRefresh:  cfg.Server.StatusRefresh,
+				DryRun:         dryRun || cfg.Server.DryRun,
+				ResyncInterval: cfg.Reconcile.ResyncInterval,
+			})
 
 			// Set up signal handling
 			sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -98,10 +109,37 @@ func NewRunCmd() *cobra.Command {
 				"resync_interval", cfg.Reconcile.ResyncInterval,
 				"grace_period", cfg.Reconcile.GracePeriod,
 				"dry_run", dryRun || cfg.Server.DryRun,
+				"listen", cfg.Server.Listen,
 			)
 
-			// Block until SIGINT/SIGTERM
+			// Start web server in background
+			webErr := make(chan error, 1)
+			go func() {
+				webErr <- webServer.Start(sigCtx)
+			}()
+
+			// Check for immediate web server startup errors
+			select {
+			case err := <-webErr:
+				if err != nil {
+					log.Error("web server failed to start", "error", err)
+				}
+			case <-time.After(2 * time.Second):
+				// Web server is starting up in background, continue
+			}
+
+			// Run daemon (blocks until shutdown)
 			daemon.Run(sigCtx)
+
+			// Wait for web server to shut down
+			select {
+			case err := <-webErr:
+				if err != nil {
+					log.Error("web server error", "error", err)
+				}
+			case <-time.After(5 * time.Second):
+				log.Warn("web server shutdown timed out")
+			}
 
 			return nil
 		},

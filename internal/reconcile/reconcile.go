@@ -25,6 +25,7 @@ type Result struct {
 	RulesPending   int
 	RulesExpired   int
 	DNSCreated     int
+	DNSUpdated     int
 	DNSDeleted     int
 	IngressUpdated bool
 	DryRun         bool
@@ -47,6 +48,9 @@ type Engine struct {
 	// Cloudflared container lifecycle (S8)
 	cloudflaredCfg   config.CloudflaredConfig
 	externalTunnelID string
+
+	// DNS conflict handling
+	overwriteConflicts bool
 }
 
 // Option configures the Engine.
@@ -64,6 +68,13 @@ func WithCloudflared(cfg config.CloudflaredConfig, externalID string) Option {
 	return func(e *Engine) {
 		e.cloudflaredCfg = cfg
 		e.externalTunnelID = externalID
+	}
+}
+
+// WithOverwriteConflicts enables overwriting conflicting DNS records.
+func WithOverwriteConflicts(overwrite bool) Option {
+	return func(e *Engine) {
+		e.overwriteConflicts = overwrite
 	}
 }
 
@@ -177,18 +188,27 @@ func (e *Engine) Run(ctx context.Context) Result {
 
 	// 7. Resolve zones and handle DNS for active rules
 	for key, rule := range active {
-		created, dnsErr := e.ensureDNS(ctx, tunnel.ID, rule)
+		created, updated, hasConflict, dnsErr := e.ensureDNS(ctx, tunnel.ID, rule)
 		if dnsErr != nil {
 			e.log.Warn("DNS error for rule", "rule", key, "error", dnsErr)
 			// Per-rule failure isolation: continue with other rules
-			if rule, ok := st.Rules[key]; ok {
-				rule.Status = "dns_conflict"
-				st.Rules[key] = rule
+			if stRule, ok := st.Rules[key]; ok {
+				stRule.Status = "dns_error"
+				st.Rules[key] = stRule
 			}
 			continue
 		}
+		if hasConflict {
+			if stRule, ok := st.Rules[key]; ok {
+				stRule.Status = "dns_conflict"
+				st.Rules[key] = stRule
+			}
+		}
 		if created {
 			res.DNSCreated++
+		}
+		if updated {
+			res.DNSUpdated++
 		}
 	}
 
@@ -219,6 +239,7 @@ func (e *Engine) Run(ctx context.Context) Result {
 		"pending", res.RulesPending,
 		"expired", res.RulesExpired,
 		"dns_created", res.DNSCreated,
+		"dns_updated", res.DNSUpdated,
 		"ingress_updated", res.IngressUpdated,
 		"dry_run", res.DryRun,
 		"duration", duration,
@@ -273,54 +294,70 @@ func (e *Engine) putIngressIfChanged(ctx context.Context, tunnelID string, local
 }
 
 // ensureDNS ensures a CNAME record exists for the rule.
-// Returns (created, error) where created is true if a new record was created.
-func (e *Engine) ensureDNS(ctx context.Context, tunnelID string, rule rules.Rule) (bool, error) {
-	zoneID, err := e.cfAPI.ResolveZone(ctx, rule.Hostname, rule.ZoneName, "")
-	if err != nil {
-		e.log.Debug("no zone for rule", "hostname", rule.Hostname, "error", err)
-		return false, nil // no zone → rule error, but still in ingress; DNS untouched
+// Returns (created, updated, hasConflict, error).
+func (e *Engine) ensureDNS(ctx context.Context, tunnelID string, rule rules.Rule) (created, updated, hasConflict bool, err error) {
+	zoneID, zoneErr := e.cfAPI.ResolveZone(ctx, rule.Hostname, rule.ZoneName, "")
+	if zoneErr != nil {
+		e.log.Debug("no zone for rule", "hostname", rule.Hostname, "error", zoneErr)
+		return false, false, false, nil // no zone → rule error, but still in ingress; DNS untouched
 	}
 
 	target := tunnelID + ".cfargotunnel.com"
-	records, err := e.cfAPI.ListDNSRecords(ctx, zoneID, rule.Hostname, "CNAME")
-	if err != nil {
-		return false, err
+	records, listErr := e.cfAPI.ListDNSRecords(ctx, zoneID, rule.Hostname, "CNAME")
+	if listErr != nil {
+		return false, false, false, listErr
 	}
 
-	// Check existing records
-	hasConflict := false
-	for _, rec := range records {
+	// Check existing records — only one CNAME per hostname is expected.
+	if len(records) > 0 {
+		rec := records[0]
 		if rec.Content == target {
 			// Record exists and is correct
 			e.log.Debug("dns record ok", "hostname", rule.Hostname)
-			return false, nil
+			return false, false, false, nil
 		}
-		// Different content → conflict; don't modify
+		// Different content → conflict
+		if e.overwriteConflicts {
+			if e.dryRun {
+				e.log.Info("would_update_dns", "hostname", rule.Hostname, "from", rec.Content, "to", target)
+				return false, false, true, nil
+			}
+			updateErr := e.cfAPI.UpdateDNSRecord(ctx, cf.DNSRecord{
+				ID:      rec.ID,
+				Name:    rule.Hostname,
+				Type:    "CNAME",
+				Content: target,
+				Proxied: true,
+				ZoneID:  zoneID,
+			})
+			if updateErr != nil {
+				return false, false, true, updateErr
+			}
+			e.log.Info("dns updated", "hostname", rule.Hostname, "from", rec.Content, "to", target)
+			return false, true, false, nil
+		}
 		e.log.Warn("dns_conflict", "hostname", rule.Hostname, "content", rec.Content)
-		hasConflict = true
-	}
-	if hasConflict {
-		return false, nil
+		return false, false, true, nil
 	}
 
 	// No record → create
 	if e.dryRun {
 		e.log.Info("would_create_dns", "hostname", rule.Hostname, "target", target)
-		return false, nil
+		return false, false, false, nil
 	}
 
-	_, err = e.cfAPI.CreateDNSRecord(ctx, cf.DNSRecord{
+	_, createErr := e.cfAPI.CreateDNSRecord(ctx, cf.DNSRecord{
 		Name:    rule.Hostname,
 		Type:    "CNAME",
 		Content: target,
 		Proxied: true,
 		ZoneID:  zoneID,
 	})
-	if err != nil {
-		return false, err
+	if createErr != nil {
+		return false, false, false, createErr
 	}
 	e.log.Info("dns created", "hostname", rule.Hostname, "target", target)
-	return true, nil
+	return true, false, false, nil
 }
 
 // deleteDNSIfOrphaned deletes DNS for expired rules if safe.

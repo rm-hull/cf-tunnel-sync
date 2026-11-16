@@ -1,9 +1,10 @@
 $schema: https://raw.githubusercontent.com/rm-hull/cf-tunnel-sync/main/config.schema.json
 
 server:
-  listen: ":5000"
+  listen: ":8080"
   log_level: INFO
   state_path: ./testdata/state.json
+  metrics: true
 
 cloudflare:
   api_token: ${CF_API_TOKEN}
@@ -24,3 +25,6 @@ labels:
 reconcile:
   grace_period: 8h
   resync_interval: 5m
+
+dns:
+  overwrite_conflicts: true

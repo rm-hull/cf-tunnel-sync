@@ -229,6 +229,22 @@ func (f *Fake) CreateDNSRecord(_ context.Context, record DNSRecord) (string, err
 	return id, nil
 }
 
+// UpdateDNSRecord updates an existing DNS record.
+func (f *Fake) UpdateDNSRecord(_ context.Context, record DNSRecord) error {
+	f.stats.Calls++
+	f.stats.ByResource["dns"]++
+
+	for zoneID, records := range f.DNSRecords {
+		for i, r := range records {
+			if r.ID == record.ID {
+				f.DNSRecords[zoneID][i] = record
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
 // DeleteDNSRecord deletes a DNS record.
 func (f *Fake) DeleteDNSRecord(_ context.Context, recordID string) error {
 	f.stats.Calls++

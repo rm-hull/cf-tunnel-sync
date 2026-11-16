@@ -27,13 +27,13 @@ type Config struct {
 
 // ServerConfig holds server-related settings.
 type ServerConfig struct {
-	Listen        string `yaml:"listen" json:"listen" descr:"HTTP listen address for the status page (e.g., :5000)."`
-	LogLevel      string `yaml:"log_level" json:"log_level" descr:"Log level: DEBUG, INFO, WARN, or ERROR."`
-	LogFormat     string `yaml:"log_format" json:"log_format" descr:"Log output format: json or text."`
-	StatePath     string `yaml:"state_path" json:"state_path" descr:"File path for persistent state (JSON)."`
-	StatusRefresh string `yaml:"status_refresh" json:"status_refresh" descr:"Meta-refresh interval for the status page; 0 disables auto-refresh."`
-	Metrics       bool   `yaml:"metrics" json:"metrics" descr:"Enable the Prometheus /metrics endpoint."`
-	DryRun        bool   `yaml:"dry_run" json:"dry_run" descr:"Log actions without making any API changes."`
+	Listen        string        `yaml:"listen" json:"listen" descr:"HTTP listen address for the status page (e.g., :8080)."`
+	LogLevel      string        `yaml:"log_level" json:"log_level" descr:"Log level: DEBUG, INFO, WARN, or ERROR."`
+	LogFormat     string        `yaml:"log_format" json:"log_format" descr:"Log output format: json or text."`
+	StatePath     string        `yaml:"state_path" json:"state_path" descr:"File path for persistent state (JSON)."`
+	StatusRefresh time.Duration `yaml:"status_refresh" json:"status_refresh" descr:"Meta-refresh interval for the status page; 0 disables auto-refresh."`
+	Metrics       bool          `yaml:"metrics" json:"metrics" descr:"Enable the Prometheus /metrics endpoint."`
+	DryRun        bool          `yaml:"dry_run" json:"dry_run" descr:"Log actions without making any API changes."`
 }
 
 // CloudflareConfig holds Cloudflare API settings.
@@ -85,11 +85,11 @@ type DNSConfig struct {
 func Defaults() Config {
 	return Config{
 		Server: ServerConfig{
-			Listen:        ":5000",
+			Listen:        ":8080",
 			LogLevel:      "INFO",
 			LogFormat:     "json",
 			StatePath:     "/data/state.json",
-			StatusRefresh: "15s",
+			StatusRefresh: 15 * time.Second,
 			Metrics:       false,
 			DryRun:        false,
 		},
