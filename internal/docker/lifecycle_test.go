@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"testing"
@@ -179,6 +180,37 @@ func TestEnsureCloudflared_dryRunDoesNotStart(t *testing.T) {
 	container, err := api.FindContainerByName(context.Background(), "cf-tunnel-sync-cloudflared")
 	require.NoError(t, err)
 	assert.Equal(t, "exited", container.State)
+}
+
+func TestEnsureCloudflared_recreatesStaleContainer(t *testing.T) {
+	fake := NewFake(Container{
+		ID:    "stale-cf",
+		Name:  "cf-tunnel-sync-cloudflared",
+		Image: "cloudflare/cloudflared:latest",
+		State: "exited",
+	}).(*fakeAPI)
+	// Simulate the network-not-found error Docker returns when the
+	// container's network was removed (eg after `docker compose down`).
+	fake.StartError = fmt.Errorf("network d4c14d8b not found")
+
+	cfAPI := cf.NewFake()
+	cfAPI.AddTunnel(cf.Tunnel{ID: "tunnel-1", Name: "homelab", ConfigSrc: "cloudflare"})
+	cfAPI.SetToken("tunnel-1", "secret-token-123")
+	cfg := CloudflaredConfig{
+		ContainerName: "cf-tunnel-sync-cloudflared",
+		Image:         "cloudflare/cloudflared:latest",
+		Network:       "cloudflare-net",
+		MetricsPort:   2000,
+	}
+
+	err := EnsureCloudflared(context.Background(), fake, cfAPI, "tunnel-1", cfg, "", false, newTestLogger())
+	require.NoError(t, err)
+
+	// Should have removed the stale container and created a new one
+	assert.Equal(t, []string{"stale-cf"}, fake.RemovedContainers)
+	assert.Equal(t, []string{"cf-tunnel-sync-cloudflared"}, fake.CreatedContainers)
+	// StartedContainers includes the failed start (stale-cf) and the successful start (new-...)
+	assert.Equal(t, []string{"stale-cf", "new-cf-tunnel-sync-cloudflared"}, fake.StartedContainers)
 }
 
 func TestEnsureCloudflared_tokenError(t *testing.T) {

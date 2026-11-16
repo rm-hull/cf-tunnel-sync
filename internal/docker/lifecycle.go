@@ -54,9 +54,18 @@ func EnsureCloudflared(ctx context.Context, api API, cfAPI cf.API,
 			}
 			log.Info("starting stopped cloudflared container", "id", existing.ID)
 			if err := api.StartContainer(ctx, existing.ID); err != nil {
-				return fmt.Errorf("start cloudflared container: %w", err)
+				// The container may be stale (eg its network was removed).
+				// Remove it and recreate from scratch.
+				log.Warn("failed to start cloudflared container, recreating", "id", existing.ID, "error", err)
+				if removeErr := api.RemoveContainer(ctx, existing.ID); removeErr != nil {
+					log.Warn("failed to remove stale cloudflared container", "id", existing.ID, "error", removeErr)
+					return fmt.Errorf("start cloudflared container: %w", err)
+				}
+				log.Info("removed stale cloudflared container", "id", existing.ID)
+				// Fall through to create a new one below.
+			} else {
+				return nil
 			}
-			return nil
 
 		default:
 			log.Warn("cloudflared container in unexpected state", "state", existing.State, "id", existing.ID)

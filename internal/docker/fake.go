@@ -17,6 +17,10 @@ type fakeAPI struct {
 	CreatedContainers []string // names of containers created
 	StartedContainers []string // IDs of containers started
 	PulledImages      []string // images pulled
+	RemovedContainers []string // IDs of containers removed
+
+	// StartError, if set, is returned by StartContainer.
+	StartError error
 }
 
 // NewFake creates a fake Docker API with the given containers.
@@ -136,11 +140,16 @@ func (a *fakeAPI) CreateContainer(_ context.Context, name, image string, _ []str
 }
 
 func (a *fakeAPI) StartContainer(_ context.Context, id string) error {
+	a.StartedContainers = append(a.StartedContainers, id)
+	if a.StartError != nil {
+		err := a.StartError
+		a.StartError = nil
+		return err
+	}
 	if c, ok := a.containers[id]; ok {
 		c.State = "running"
 		a.containers[id] = c
 	}
-	a.StartedContainers = append(a.StartedContainers, id)
 	return nil
 }
 
@@ -153,6 +162,7 @@ func (a *fakeAPI) StopContainer(_ context.Context, id string) error {
 }
 
 func (a *fakeAPI) RemoveContainer(_ context.Context, id string) error {
+	a.RemovedContainers = append(a.RemovedContainers, id)
 	delete(a.containers, id)
 	return nil
 }
