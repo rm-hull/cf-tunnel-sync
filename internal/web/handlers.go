@@ -30,6 +30,7 @@ func (s *Server) handleIndex(c *gin.Context) {
 		"healthySentence": healthySentence,
 		"formatDuration":  formatDuration,
 		"formatUptime":    formatUptime,
+		"formatTime":      formatTime,
 		"statusClass":     statusClass,
 		"statusLabel":     statusLabel,
 		"last": func(n int, items []LogEvent) []LogEvent {
@@ -126,6 +127,12 @@ func formatDuration(d time.Duration) string {
 func formatUptime(seconds float64) string {
 	d := time.Duration(seconds * float64(time.Second))
 	return formatDuration(d)
+}
+
+// formatTime formats a time value truncated to milliseconds.
+func formatTime(t time.Time) string {
+	t = t.Truncate(time.Millisecond)
+	return t.Format("2006-01-02 15:04:05.000 MST")
 }
 
 // statusClass returns the CSS class for a rule status.
