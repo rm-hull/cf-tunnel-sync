@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -86,9 +87,14 @@ func (s *Server) handleReadyz(c *gin.Context) {
 	c.String(http.StatusOK, "ready")
 }
 
-// handleMetrics exposes Prometheus metrics.
+// handleMetrics exposes Prometheus metrics including daemon stats.
 func (s *Server) handleMetrics(c *gin.Context) {
-	promhttp.Handler().ServeHTTP(c.Writer, c.Request)
+	gatherer := s.metricsGatherer
+	if gatherer == nil {
+		gatherer = prometheus.DefaultGatherer
+	}
+	handler := promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{})
+	handler.ServeHTTP(c.Writer, c.Request)
 }
 
 // handleCSS serves the embedded CSS with immutable cache headers.

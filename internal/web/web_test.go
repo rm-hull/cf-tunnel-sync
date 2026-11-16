@@ -278,7 +278,7 @@ func Test_metrics_disabled(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
-// Test_metrics_enabled verifies metrics returns 200 when enabled.
+// Test_metrics_enabled verifies metrics returns 200 with custom metrics when enabled.
 func Test_metrics_enabled(t *testing.T) {
 	server := newTestServer(t, withMetrics())
 
@@ -288,6 +288,18 @@ func Test_metrics_enabled(t *testing.T) {
 	server.engine.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+
+	// Verify custom metrics are present
+	assert.Contains(t, body, "cftunnelsync_tunnel_pass_count_total")
+	assert.Contains(t, body, "cftunnelsync_tunnel_last_pass_duration_seconds")
+	assert.Contains(t, body, "cftunnelsync_tunnel_last_error")
+	assert.Contains(t, body, "cftunnelsync_tunnel_cf_api_calls_total")
+	assert.Contains(t, body, "cftunnelsync_tunnel_cf_api_errors_total")
+	assert.Contains(t, body, "cftunnelsync_tunnel_docker_events_total")
+
+	// Verify default Go/runtime metrics are also present
+	assert.Contains(t, body, "go_goroutines")
 }
 
 // Test_css_served verifies the CSS file is served with correct headers.

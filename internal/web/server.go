@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 	sloggin "github.com/samber/slog-gin"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/cf"
@@ -29,19 +30,20 @@ var cssContent string
 
 // Server holds the web server and its dependencies.
 type Server struct {
-	log            *slog.Logger
-	engine         *gin.Engine
-	daemon         *reconcile.Daemon
-	ring           *logx.RingBufferHandler
-	cfAPI          cf.API
-	statePath      string
-	resyncInterval time.Duration
-	metricsEnabled bool
-	dryRun         bool
-	listenAddr     string
-	statusRefresh  time.Duration
-	server         *http.Server
-	startedAt      time.Time
+	log             *slog.Logger
+	engine          *gin.Engine
+	daemon          *reconcile.Daemon
+	ring            *logx.RingBufferHandler
+	cfAPI           cf.API
+	statePath       string
+	resyncInterval  time.Duration
+	metricsEnabled  bool
+	dryRun          bool
+	listenAddr      string
+	statusRefresh   time.Duration
+	metricsGatherer prometheus.Gatherer
+	server          *http.Server
+	startedAt       time.Time
 }
 
 // Config holds the web server configuration.
@@ -78,6 +80,10 @@ func NewServer(
 		listenAddr:     cfg.Listen,
 		statusRefresh:  cfg.StatusRefresh,
 		startedAt:      time.Now(),
+	}
+
+	if cfg.Metrics {
+		s.metricsGatherer = newMetricsGatherer(daemon)
 	}
 
 	s.setupRoutes()
