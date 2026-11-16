@@ -1,0 +1,65 @@
+services:
+  cf-tunnel-sync:
+    container_name: cf-tunnel-sync
+    image: ghcr.io/rm-hull/cf-tunnel-sync:latest
+    restart: unless-stopped
+    command: ["run", "--config", "/config/config.yaml"]
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Europe/London
+      CF_API_TOKEN: ${CF_API_TOKEN}
+      CF_ACCOUNT_ID: ${CF_ACCOUNT_ID}
+      CF_ZONE_ID: ${CF_ZONE_ID:-}
+      DOCKER_HOST: tcp://docker-proxy:2375
+    volumes:
+      - ./config.example.yaml:/config/config.yaml:ro
+      - ./testdata:/data
+    depends_on:
+      docker-proxy:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "/app/cf-tunnel-sync", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - test-net
+      - proxy-net
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: docker-proxy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CONTAINERS: "1"
+      IMAGES: "1"
+      NETWORKS: "1"
+      INFO: "1"
+      VERSION: "1"
+      PING: "1"
+      EVENTS: "1"
+      POST: "1"
+    networks:
+      - proxy-net
+
+  whoami:
+    image: traefik/whoami
+    restart: unless-stopped
+    environment:
+      TEST_HOSTNAME: ${TEST_HOSTNAME}
+    labels:
+      - "cloudflare.tunnel.enable=true"
+      - "cloudflare.tunnel.hostname=${TEST_HOSTNAME}"
+      - "cloudflare.tunnel.service=http://whoami:80"
+    networks:
+      - test-net
+
+networks:
+  test-net:
+    name: test-net
+  proxy-net:
+    internal: true

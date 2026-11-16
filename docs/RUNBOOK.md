@@ -22,50 +22,39 @@ docker compose -f docker-compose.example.yml up -d
 
 ## Docker Socket Access
 
-The daemon needs Docker API access to manage containers and listen for events. There are two approaches:
+The daemon uses a [Docker Socket Proxy](https://github.com/Tecnativa/docker-socket-proxy) to communicate with Docker. The proxy is included in `docker-compose.example.yml` and `docker-compose.yaml`.
 
-### Option A: Group Access (Simpler)
-
-Add the Docker group GID to the container:
-
-```yaml
-group_add:
-  - "998"  # replace with your Docker group GID
-```
-
-Find the GID on your host:
-```bash
-getent group docker | cut -d: -f3
-# or
-stat -c '%g' /var/run/docker.sock
-```
-
-### Option B: Socket Proxy (More Secure)
-
-Use a socket proxy to limit API access to only the operations cf-tunnel-sync needs:
+The proxy runs on an internal network (`proxy-net`) and exposes only the endpoints cf-tunnel-sync needs: listing containers, events, creating/starting/stopping/removing containers, pulling images, and network info.
 
 ```yaml
 services:
   cf-tunnel-sync:
     environment:
       DOCKER_HOST: tcp://docker-proxy:2375
-    # Do not mount the socket directly
+    # No direct socket mount needed
 
   docker-proxy:
-    image: tecnativa/docker-socket-proxy
+    image: tecnativa/docker-socket-proxy:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      CONTAINERS: 1
-      EVENTS: 1
-      NETWORKS: 1
-      IMAGES: 1
-      POST: 1
-      PING: 1
-      INFO: 1
+      CONTAINERS: "1"
+      IMAGES: "1"
+      NETWORKS: "1"
+      INFO: "1"
+      VERSION: "1"
+      PING: "1"
+      EVENTS: "1"
+      POST: "1"
+    networks:
+      - proxy-net
+
+networks:
+  proxy-net:
+    internal: true
 ```
 
-This restricts access to only the endpoints the daemon uses (listing containers, events, creating/starting the cloudflared container).
+The `internal: true` flag on `proxy-net` prevents the proxy from being accessible from outside Docker.
 
 ## Configuration
 
