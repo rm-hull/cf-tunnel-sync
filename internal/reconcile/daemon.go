@@ -25,22 +25,27 @@ type DaemonConfig struct {
 
 // Snapshot holds the current state of the daemon for status reporting.
 type Snapshot struct {
-	TunnelID      string
-	TunnelName    string
-	Connections   int
-	PassCount     int
-	LastDuration  time.Duration
-	LastError     error
-	RulesActive   int
-	RulesPending  int
-	RulesExpired  int
-	RulesConflict int
-	CFStats       cf.Stats
-	EventCount    int // total accumulated events (kept for backward compatibility)
-	// EventCounts tracks accumulated Docker events per container and action type.
-	// Key: container name, value: map of action -> count.
-	EventCounts  map[string]map[string]int
-	LastPassTime time.Time
+	TunnelID            string
+	TunnelName          string
+	Connections         int
+	PassCount           int
+	LastDuration        time.Duration
+	LastError           error
+	RulesActive         int
+	RulesPending        int
+	RulesExpired        int
+	RulesConflict       int
+	CFStats             cf.Stats
+	EventCount          int // total accumulated events (kept for backward compatibility)
+	EventCounts         map[string]map[string]int
+	LastPassTime        time.Time
+	ConsecutiveFailures int
+	DeferredPass        bool
+	RulesAddedTotal     int
+	RulesUpdatedTotal   int
+	DNSCreatedTotal     int
+	DNSUpdatedTotal     int
+	IngressUpdatedTotal int
 }
 
 // Daemon orchestrates the event-driven reconciliation loop.
@@ -368,6 +373,15 @@ func (d *Daemon) runPass(ctx context.Context) {
 	d.snap.RulesConflict = res.RulesConflict
 	d.snap.Connections = connections
 	d.snap.LastPassTime = start
+	d.snap.ConsecutiveFailures = d.consecutiveFailures
+	d.snap.DeferredPass = d.deferredPass
+	d.snap.RulesAddedTotal += res.RulesAdded
+	d.snap.RulesUpdatedTotal += res.RulesUpdated
+	d.snap.DNSCreatedTotal += res.DNSCreated
+	d.snap.DNSUpdatedTotal += res.DNSUpdated
+	if res.IngressUpdated {
+		d.snap.IngressUpdatedTotal++
+	}
 	if res.Tunnel.ID != "" {
 		d.snap.TunnelID = res.Tunnel.ID
 		d.snap.TunnelName = res.Tunnel.Name
