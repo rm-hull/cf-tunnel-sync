@@ -33,8 +33,11 @@ type Snapshot struct {
 	RulesExpired  int
 	RulesConflict int
 	CFStats       cf.Stats
-	EventCount    int
-	LastPassTime  time.Time
+	EventCount    int // total accumulated events (kept for backward compatibility)
+	// EventCounts tracks accumulated Docker events per container and action type.
+	// Key: container name, value: map of action -> count.
+	EventCounts  map[string]map[string]int
+	LastPassTime time.Time
 }
 
 // Daemon orchestrates the event-driven reconciliation loop.
@@ -122,6 +125,19 @@ func (d *Daemon) Snapshot() Snapshot {
 	return d.snap
 }
 
+// SetEventCounts injects event counts into the snapshot for testing.
+func (d *Daemon) SetEventCounts(counts map[string]map[string]int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.snap.EventCounts = counts
+	d.snap.EventCount = 0
+	for _, actions := range counts {
+		for _, c := range actions {
+			d.snap.EventCount += c
+		}
+	}
+}
+
 // Run starts the daemon loop. It blocks until ctx is cancelled.
 // On cancellation, it waits for any in-progress pass to complete before returning.
 func (d *Daemon) Run(ctx context.Context) {
@@ -159,8 +175,21 @@ func (d *Daemon) Run(ctx context.Context) {
 			}
 			d.mu.Lock()
 			d.snap.EventCount++
+			containerName := evt.Actor["name"]
+			if containerName == "" && len(evt.ID) >= 12 {
+				containerName = evt.ID[:12]
+			} else if containerName == "" {
+				containerName = evt.ID
+			}
+			if d.snap.EventCounts == nil {
+				d.snap.EventCounts = make(map[string]map[string]int)
+			}
+			if d.snap.EventCounts[containerName] == nil {
+				d.snap.EventCounts[containerName] = make(map[string]int)
+			}
+			d.snap.EventCounts[containerName][evt.Action]++
 			d.mu.Unlock()
-			d.log.Debug("docker event", "action", evt.Action)
+			d.log.Debug("docker event", "action", evt.Action, "container", containerName)
 			if !debounceTimer.Stop() {
 				// Timer already fired; drain the channel
 				select {

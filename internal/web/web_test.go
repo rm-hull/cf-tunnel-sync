@@ -91,7 +91,17 @@ func newTestServer(t *testing.T, opts ...func(*testServerOpts)) *Server {
 		ResyncInterval: 5 * time.Minute,
 	}
 
-	return NewServer(log, daemon, ring, cfAPI, statePath, cfg)
+	server := NewServer(log, daemon, ring, cfAPI, statePath, cfg)
+
+	// Inject test event counts so metrics endpoint has data
+	if optCfg.metricsEnabled {
+		daemon.SetEventCounts(map[string]map[string]int{
+			"whoami": {"start": 3, "die": 1},
+			"nginx":  {"start": 2},
+		})
+	}
+
+	return server
 }
 
 type testServerOpts struct {
@@ -301,7 +311,11 @@ func Test_metrics_enabled(t *testing.T) {
 	assert.Contains(t, body, "cftunnelsync_rules_conflict")
 	assert.Contains(t, body, "cftunnelsync_cf_api_calls_total")
 	assert.Contains(t, body, "cftunnelsync_cf_api_errors_total")
-	assert.Contains(t, body, "cftunnelsync_docker_events_total")
+
+	// Verify Docker events metric has container and action labels
+	assert.Contains(t, body, `cftunnelsync_docker_events_total{action="start",container="whoami"} 3`, "whoami start events")
+	assert.Contains(t, body, `cftunnelsync_docker_events_total{action="die",container="whoami"} 1`, "whoami die events")
+	assert.Contains(t, body, `cftunnelsync_docker_events_total{action="start",container="nginx"} 2`, "nginx start events")
 
 	// Verify default Go/runtime metrics are also present
 	assert.Contains(t, body, "go_goroutines")

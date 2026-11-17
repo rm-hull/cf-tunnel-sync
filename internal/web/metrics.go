@@ -82,8 +82,8 @@ func newDaemonCollector(daemon *reconcile.Daemon) *daemonCollector {
 		),
 		descEventCount: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "docker", "events_total"),
-			"Total Docker events received.",
-			nil, nil,
+			"Total Docker events received per container and action.",
+			[]string{"container", "action"}, nil,
 		),
 		descTunnelID: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "tunnel", "id"),
@@ -140,7 +140,16 @@ func (c *daemonCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	ch <- prometheus.MustNewConstMetric(c.descEventCount, prometheus.CounterValue, float64(snap.EventCount))
+	// Emit Docker events per container and action
+	if snap.EventCounts != nil {
+		for container, actions := range snap.EventCounts {
+			for action, count := range actions {
+				ch <- prometheus.MustNewConstMetric(
+					c.descEventCount, prometheus.CounterValue, float64(count), container, action,
+				)
+			}
+		}
+	}
 
 	if snap.TunnelID != "" {
 		ch <- prometheus.MustNewConstMetric(c.descTunnelID, prometheus.GaugeValue, 1, snap.TunnelID, snap.TunnelName)

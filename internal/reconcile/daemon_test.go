@@ -48,6 +48,13 @@ func (s *testEventStream) sendEvent(action string) {
 	s.events <- docker.Event{Action: action}
 }
 
+func (s *testEventStream) sendEventWithContainer(action, containerName string) {
+	s.events <- docker.Event{
+		Action: action,
+		Actor:  map[string]string{"name": containerName},
+	}
+}
+
 func (s *testEventStream) sendReconnect() {
 	s.reconnected <- struct{}{}
 }
@@ -668,4 +675,109 @@ func (f *failingCFWrapper) FindTunnel(ctx context.Context, name string) (cf.Tunn
 		return cf.Tunnel{}, os.ErrNotExist
 	}
 	return f.Fake.FindTunnel(ctx, name)
+}
+
+// TestDaemon_event_counts tracks Docker events per container and action type.
+func TestDaemon_event_counts(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stateDir := tempStateDirDaemon(t)
+	statePath := filepath.Join(stateDir, "state.json")
+
+	cfAPI := setupFakeCFDaemon(t)
+	stream := newTestEventStream()
+	dockerAPI := &fakeDockerWithEvents{
+		API:    docker.NewFake(),
+		stream: stream,
+	}
+
+	eng := reconcile.New(
+		testLoggerDaemon(),
+		dockerAPI,
+		cfAPI,
+		statePath,
+		"homelab",
+		[]string{"cloudflare.tunnel"},
+		8*time.Hour,
+	)
+
+	daemon := reconcile.NewDaemon(
+		testLoggerDaemon(),
+		eng,
+		dockerAPI,
+		cfAPI,
+		reconcile.DaemonConfig{
+			Debounce:        50 * time.Millisecond,
+			ResyncInterval:  5 * time.Minute,
+			MinimumInterval: 0,
+		},
+		config.CloudflaredConfig{},
+		"",
+		false,
+	)
+
+	done := make(chan struct{})
+	go func() {
+		daemon.Run(ctx)
+		close(done)
+	}()
+
+	// Send events for different containers and actions
+	stream.sendEventWithContainer("start", "whoami")
+	stream.sendEventWithContainer("start", "whoami")
+	stream.sendEventWithContainer("die", "whoami")
+	stream.sendEventWithContainer("start", "nginx")
+
+	// Wait for events to be processed
+	time.Sleep(200 * time.Millisecond)
+
+	// Cancel to stop the daemon
+	cancel()
+	<-done
+
+	snap := daemon.Snapshot()
+
+	// Total event count should match
+	assert.Equal(t, 4, snap.EventCount, "total events should be 4")
+
+	// Per-container counts
+	assert.NotNil(t, snap.EventCounts["whoami"], "whoami should have event counts")
+	assert.Equal(t, 2, snap.EventCounts["whoami"]["start"], "whoami should have 2 start events")
+	assert.Equal(t, 1, snap.EventCounts["whoami"]["die"], "whoami should have 1 die event")
+
+	assert.NotNil(t, snap.EventCounts["nginx"], "nginx should have event counts")
+	assert.Equal(t, 1, snap.EventCounts["nginx"]["start"], "nginx should have 1 start event")
+}
+
+// TestDaemon_setEventCounts verifies the SetEventCounts helper correctly
+// populates the snapshot for testing purposes.
+func TestDaemon_setEventCounts(t *testing.T) {
+	daemon := reconcile.NewDaemon(
+		testLoggerDaemon(),
+		reconcile.New(
+			testLoggerDaemon(),
+			docker.NewFake(),
+			cf.NewFake(),
+			"/tmp/state.json",
+			"test",
+			[]string{"cloudflare.tunnel"},
+			8*time.Hour,
+		),
+		docker.NewFake(),
+		cf.NewFake(),
+		reconcile.DaemonConfig{},
+		config.CloudflaredConfig{},
+		"",
+		false,
+	)
+
+	daemon.SetEventCounts(map[string]map[string]int{
+		"whoami": {"start": 3, "die": 1},
+		"nginx":  {"start": 2},
+	})
+
+	snap := daemon.Snapshot()
+	assert.Equal(t, 6, snap.EventCount, "total should be sum of all counts")
+	assert.Equal(t, 3, snap.EventCounts["whoami"]["start"])
+	assert.Equal(t, 1, snap.EventCounts["whoami"]["die"])
+	assert.Equal(t, 2, snap.EventCounts["nginx"]["start"])
 }
