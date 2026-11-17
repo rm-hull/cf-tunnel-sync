@@ -13,11 +13,13 @@ import (
 
 // DaemonConfig holds the configuration for the daemon loop.
 type DaemonConfig struct {
-	Debounce        time.Duration
-	ResyncInterval  time.Duration
-	BackoffInitial  time.Duration
-	BackoffMax      time.Duration
-	MinimumInterval time.Duration
+	Debounce                  time.Duration
+	ResyncInterval            time.Duration
+	BackoffInitial            time.Duration
+	BackoffMax                time.Duration
+	MinimumInterval           time.Duration
+	ReconnectBackoffInitial   time.Duration
+	ReconnectBackoffMax       time.Duration
 }
 
 // Snapshot holds the current state of the daemon for status reporting.
@@ -96,6 +98,12 @@ func NewDaemon(
 	if cfg.MinimumInterval < 0 {
 		cfg.MinimumInterval = 0
 	}
+	if cfg.ReconnectBackoffInitial <= 0 {
+		cfg.ReconnectBackoffInitial = 1 * time.Second
+	}
+	if cfg.ReconnectBackoffMax <= 0 {
+		cfg.ReconnectBackoffMax = 30 * time.Second
+	}
 	return &Daemon{
 		log:              log,
 		eng:              eng,
@@ -144,8 +152,6 @@ func (d *Daemon) SetEventCounts(counts map[string]map[string]int) {
 // Run starts the daemon loop. It blocks until ctx is cancelled.
 // On cancellation, it waits for any in-progress pass to complete before returning.
 func (d *Daemon) Run(ctx context.Context) {
-	// Start Docker event stream with label filters so only containers
-	// with our label prefixes generate events.
 	prefixes := d.eng.Prefixes()
 	stream := d.dockerAPI.Events(ctx, prefixes)
 
@@ -160,6 +166,11 @@ func (d *Daemon) Run(ctx context.Context) {
 
 	// Resync timer
 	resyncTimer := time.NewTimer(d.cfg.ResyncInterval)
+
+	// Reconnect backoff state (R3).
+	connectedAt := time.Now()
+	reconnectFailures := 0
+	var reconnect <-chan time.Time // nil while connected
 
 	defer func() {
 		debounceTimer.Stop()
@@ -182,12 +193,16 @@ func (d *Daemon) Run(ctx context.Context) {
 
 		case evt, ok := <-stream.Events:
 			if !ok {
-				// Event stream closed; restart
-				d.log.Warn("docker event stream closed, restarting")
-				stream = d.dockerAPI.Events(ctx, prefixes)
-				d.Trigger()
+				d.log.Warn("docker event stream closed, will reconnect")
+				stream.Events, stream.Err, stream.Reconnected = nil, nil, nil
+				if time.Since(connectedAt) > 30*time.Second {
+					reconnectFailures = 0
+				}
+				reconnect = time.After(reconnectDelay(d.cfg, reconnectFailures))
+				reconnectFailures++
 				continue
 			}
+			reconnectFailures = 0
 			d.mu.Lock()
 			d.snap.EventCount++
 			containerName := evt.Actor["name"]
@@ -205,7 +220,6 @@ func (d *Daemon) Run(ctx context.Context) {
 			d.snap.EventCounts[containerName][evt.Action]++
 			d.mu.Unlock()
 			if !debounceTimer.Stop() {
-				// Timer already fired; drain the channel
 				select {
 				case <-debounceTimer.C:
 				default:
@@ -214,14 +228,24 @@ func (d *Daemon) Run(ctx context.Context) {
 			debounceTimer.Reset(d.cfg.Debounce)
 
 		case <-stream.Reconnected:
-			d.log.Info("docker event stream reconnected, triggering pass")
+			d.log.Info("docker event stream interrupted, triggering pass")
 			select {
 			case d.trigger <- struct{}{}:
 			default:
 			}
 
-		case err := <-stream.Err:
+		case err, ok := <-stream.Err:
+			if !ok {
+				stream.Err = nil
+				continue
+			}
 			d.log.Error("docker event stream error", "error", err)
+
+		case <-reconnect:
+			reconnect = nil
+			stream = d.dockerAPI.Events(ctx, prefixes)
+			connectedAt = time.Now()
+			d.Trigger()
 
 		case <-debounceTimer.C:
 			d.log.Info("debounce timer fired")
@@ -402,4 +426,20 @@ func backoffFor(cfg DaemonConfig, passCount int) time.Duration {
 		backoff = cfg.BackoffMax
 	}
 	return backoff
+}
+
+// reconnectDelay computes the backoff for reconnecting the Docker event stream (R3).
+func reconnectDelay(cfg DaemonConfig, failures int) time.Duration {
+	delay := cfg.ReconnectBackoffInitial
+	for i := 0; i < failures && i < 10; i++ {
+		delay *= 2
+		if delay > cfg.ReconnectBackoffMax {
+			delay = cfg.ReconnectBackoffMax
+			break
+		}
+	}
+	if delay > cfg.ReconnectBackoffMax {
+		delay = cfg.ReconnectBackoffMax
+	}
+	return delay
 }

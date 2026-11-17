@@ -6,8 +6,24 @@ import (
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/docker"
 	"github.com/rm-hull/cf-tunnel-sync/internal/reconcile"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// R3 — Docker event stream reconnect is a hot loop
+func TestDaemon_ReconnectIsRateLimited(t *testing.T) {
+	cd := &countingDocker{API: docker.NewFake()}
+	d := newTestDaemon(t, cd, setupFakeCF(t), reconcile.DaemonConfig{
+		Debounce: time.Hour, ResyncInterval: time.Hour, MinimumInterval: time.Minute,
+	})
+	stop := runDaemon(t, d)
+
+	time.Sleep(300 * time.Millisecond) // the only allowed sleep: we measure a rate
+	stop()
+
+	assert.LessOrEqual(t, cd.calls.Load(), int64(3),
+		"Events() was called %d times in 300ms: reconnect must back off", cd.calls.Load())
+}
 
 // R13 — Negative MinimumInterval means no minimum
 func TestNewDaemon_NegativeMinimumIntervalMeansNoMinimum(t *testing.T) {
