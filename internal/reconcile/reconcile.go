@@ -106,6 +106,11 @@ func New(
 	return e
 }
 
+// Prefixes returns the configured label prefixes.
+func (e *Engine) Prefixes() []string {
+	return e.prefixes
+}
+
 // Run executes one reconciliation pass per §6.7.
 func (e *Engine) Run(ctx context.Context) Result {
 	start := time.Now()

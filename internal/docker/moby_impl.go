@@ -127,7 +127,7 @@ func (a *mobyAPI) DesiredRules(ctx context.Context, prefixes []string, allowUnpr
 	return rules, allIssues, nil
 }
 
-func (a *mobyAPI) Events(ctx context.Context, _ []string) EventStream {
+func (a *mobyAPI) Events(ctx context.Context, prefixes []string) EventStream {
 	evtCh := make(chan Event)
 	reconnectCh := make(chan struct{})
 	errCh := make(chan error)
@@ -139,6 +139,13 @@ func (a *mobyAPI) Events(ctx context.Context, _ []string) EventStream {
 	filters := mobyclient.Filters{}
 	filters = filters.Add("type", "container")
 	filters = filters.Add("action", "start", "die")
+
+	// Filter by label prefixes so we only receive events for containers
+	// that have our label keys (e.g., cloudflare.tunnel.enable=true).
+	// Docker ORs multiple values for the same filter key.
+	for _, prefix := range prefixes {
+		filters = filters.Add("label", prefix+".enable=true")
+	}
 
 	a.log.Debug("starting Docker events subscription", "filters", filters)
 

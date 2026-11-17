@@ -125,8 +125,10 @@ func (d *Daemon) Snapshot() Snapshot {
 // Run starts the daemon loop. It blocks until ctx is cancelled.
 // On cancellation, it waits for any in-progress pass to complete before returning.
 func (d *Daemon) Run(ctx context.Context) {
-	// Start Docker event stream
-	stream := d.dockerAPI.Events(ctx, nil)
+	// Start Docker event stream with label filters so only containers
+	// with our label prefixes generate events.
+	prefixes := d.eng.Prefixes()
+	stream := d.dockerAPI.Events(ctx, prefixes)
 
 	// Debounce timer
 	debounceTimer := time.NewTimer(d.cfg.Debounce)
@@ -151,7 +153,7 @@ func (d *Daemon) Run(ctx context.Context) {
 			if !ok {
 				// Event stream closed; restart
 				d.log.Warn("docker event stream closed, restarting")
-				stream = d.dockerAPI.Events(ctx, nil)
+				stream = d.dockerAPI.Events(ctx, prefixes)
 				d.Trigger()
 				continue
 			}
