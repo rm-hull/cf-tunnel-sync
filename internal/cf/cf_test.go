@@ -215,7 +215,7 @@ func TestDeleteDNSRecord(t *testing.T) {
 		Content: "abc.cfargotunnel.com", ZoneID: "z1",
 	})
 
-	err := fake.DeleteDNSRecord(context.Background(), "r1")
+	err := fake.DeleteDNSRecord(context.Background(), "z1", "r1")
 	require.NoError(t, err)
 
 	records, _ := fake.ListDNSRecords(context.Background(), "z1", "", "")
@@ -716,8 +716,8 @@ func TestFake_PutIngress_versionIncrement(t *testing.T) {
 
 func TestFake_DeleteDNSRecord_notFound(t *testing.T) {
 	fake := cf.NewFake()
-	err := fake.DeleteDNSRecord(context.Background(), "missing")
-	assert.NoError(t, err)
+	err := fake.DeleteDNSRecord(context.Background(), "z1", "missing")
+	require.Error(t, err)
 }
 
 func TestFake_ListDNSRecords_noRecords(t *testing.T) {

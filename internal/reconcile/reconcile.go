@@ -430,9 +430,9 @@ func (e *Engine) deleteDNSIfOrphaned(ctx context.Context, tunnelID string, rule 
 				return
 			}
 			// R5b: retry failed delete once
-			if err := e.cfAPI.DeleteDNSRecord(ctx, rec.ID); err != nil {
+			if err := e.cfAPI.DeleteDNSRecord(ctx, zoneID, rec.ID); err != nil {
 				e.log.Debug("dns delete failed, retrying", "hostname", rule.Hostname, "error", err)
-				if err2 := e.cfAPI.DeleteDNSRecord(ctx, rec.ID); err2 != nil {
+				if err2 := e.cfAPI.DeleteDNSRecord(ctx, zoneID, rec.ID); err2 != nil {
 					e.log.Warn("dns delete failed after retry", "hostname", rule.Hostname, "error", err2)
 				} else {
 					e.log.Info("dns deleted (after retry)", "hostname", rule.Hostname)
@@ -488,8 +488,8 @@ func ingressEqual(a, b []rules.IngressEntry) bool {
 		ao := ae.OriginRequest
 		bo := be.OriginRequest
 		// R11: normalize nil vs empty OriginRequest
-		aoEmpty := ao == nil || (ao.NoTLSVerify == false && ao.OriginServerName == "")
-		boEmpty := bo == nil || (bo.NoTLSVerify == false && bo.OriginServerName == "")
+		aoEmpty := ao == nil || (!ao.NoTLSVerify && ao.OriginServerName == "")
+		boEmpty := bo == nil || (!bo.NoTLSVerify && bo.OriginServerName == "")
 		if aoEmpty && boEmpty {
 			continue
 		}

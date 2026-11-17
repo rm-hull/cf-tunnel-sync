@@ -35,6 +35,7 @@ func newStubDocker() *stubDocker {
 	return &stubDocker{API: docker.NewFake(), rules: map[string]labels.Rule{}}
 }
 
+//nolint:unused // used by regression tests
 func (s *stubDocker) setRules(rs ...labels.Rule) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -44,6 +45,7 @@ func (s *stubDocker) setRules(rs ...labels.Rule) {
 	}
 }
 
+//nolint:unused // used by regression tests
 func (s *stubDocker) lastAllowUnprotected() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -90,11 +92,11 @@ func (f *flakyCF) CreateDNSRecord(ctx context.Context, r cf.DNSRecord) (string, 
 	return f.Fake.CreateDNSRecord(ctx, r)
 }
 
-func (f *flakyCF) DeleteDNSRecord(ctx context.Context, id string) error {
+func (f *flakyCF) DeleteDNSRecord(ctx context.Context, zoneID, id string) error {
 	if f.failDeleteDNS.Load() {
 		return errInjected
 	}
-	return f.Fake.DeleteDNSRecord(ctx, id)
+	return f.Fake.DeleteDNSRecord(ctx, zoneID, id)
 }
 
 func (f *flakyCF) FindTunnel(ctx context.Context, name string) (cf.Tunnel, error) {
@@ -132,6 +134,7 @@ func runDaemon(t *testing.T, d *reconcile.Daemon) (stop func()) {
 	return stop
 }
 
+//nolint:unused // used by regression tests
 func ingressHosts(f *cf.Fake, tunnelID string) []string {
 	var out []string
 	for _, r := range f.Ingress[tunnelID].Rules {

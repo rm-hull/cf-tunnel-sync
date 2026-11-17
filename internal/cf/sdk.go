@@ -378,28 +378,19 @@ func (s *sdkAPI) UpdateDNSRecord(ctx context.Context, record DNSRecord) error {
 	return nil
 }
 
-// DeleteDNSRecord deletes a DNS record.
-func (s *sdkAPI) DeleteDNSRecord(ctx context.Context, recordID string) error {
+// DeleteDNSRecord deletes a DNS record in the given zone (R14).
+func (s *sdkAPI) DeleteDNSRecord(ctx context.Context, zoneID, recordID string) error {
 	s.inc("dns")
-	s.log.Debug("delete DNS record", "id", recordID)
-	// Find the record to get its zone ID
-	zones, err := s.ListZones(ctx)
+	s.log.Debug("delete DNS record", "id", recordID, "zone", zoneID)
+	rc := cfdns.ZoneIdentifier(zoneID)
+	err := s.cf.DeleteDNSRecord(ctx, rc, recordID)
 	if err != nil {
-		s.log.Debug("delete DNS record failed", "id", recordID, "error", err)
-		return fmt.Errorf("list zones for DNS delete: %w", err)
+		s.incErr("dns")
+		s.log.Debug("delete DNS record failed", "id", recordID, "zone", zoneID, "error", err)
+		return fmt.Errorf("delete DNS record: %w", err)
 	}
-	for _, z := range zones {
-		rc := cfdns.ZoneIdentifier(z.ID)
-		err := s.cf.DeleteDNSRecord(ctx, rc, recordID)
-		if err == nil {
-			s.log.Debug("deleted DNS record", "id", recordID, "zone", z.ID)
-			return nil
-		}
-		// Try next zone
-	}
-	s.incErr("dns")
-	s.log.Debug("delete DNS record not found in any zone", "id", recordID)
-	return fmt.Errorf("delete DNS record: not found in any zone")
+	s.log.Debug("deleted DNS record", "id", recordID, "zone", zoneID)
+	return nil
 }
 
 // Plan performs a dry-run reconciliation.

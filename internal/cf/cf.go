@@ -124,9 +124,9 @@ type API interface {
 	// In read-only mode, returns ErrReadOnly.
 	UpdateDNSRecord(ctx context.Context, record DNSRecord) error
 
-	// DeleteDNSRecord deletes a DNS record.
-	// In read-only mode, returns ErrReadOnly.
-	DeleteDNSRecord(ctx context.Context, recordID string) error
+	// DeleteDNSRecord deletes a DNS record in the given zone.
+	// In read-only mode, returns ErrReadOnly. (R14)
+	DeleteDNSRecord(ctx context.Context, zoneID, recordID string) error
 
 	// Plan performs a dry-run reconciliation and returns planned actions.
 	Plan(ctx context.Context, tunnelID string, desiredRules map[string]rules.Rule,

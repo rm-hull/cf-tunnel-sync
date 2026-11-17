@@ -3,6 +3,7 @@ package cf
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/rm-hull/cf-tunnel-sync/internal/rules"
@@ -245,25 +246,27 @@ func (f *Fake) UpdateDNSRecord(_ context.Context, record DNSRecord) error {
 	return nil
 }
 
-// DeleteDNSRecord deletes a DNS record.
-func (f *Fake) DeleteDNSRecord(_ context.Context, recordID string) error {
+// DeleteDNSRecord deletes a DNS record in the given zone (R14).
+func (f *Fake) DeleteDNSRecord(_ context.Context, zoneID, recordID string) error {
 	f.stats.Calls++
 	f.stats.ByResource["dns"]++
 
-	for zoneID, records := range f.DNSRecords {
-		var filtered []DNSRecord
-		for _, r := range records {
-			if r.ID != recordID {
-				filtered = append(filtered, r)
-			}
+	records, ok := f.DNSRecords[zoneID]
+	if !ok {
+		return fmt.Errorf("delete DNS record: not found in zone %s", zoneID)
+	}
+	var filtered []DNSRecord
+	for _, r := range records {
+		if r.ID != recordID {
+			filtered = append(filtered, r)
 		}
-		if len(filtered) < len(records) {
-			f.DNSRecords[zoneID] = filtered
-			if len(filtered) == 0 {
-				delete(f.DNSRecords, zoneID)
-			}
-			return nil
-		}
+	}
+	if len(filtered) == len(records) {
+		return fmt.Errorf("delete DNS record: %s not found in zone %s", recordID, zoneID)
+	}
+	f.DNSRecords[zoneID] = filtered
+	if len(filtered) == 0 {
+		delete(f.DNSRecords, zoneID)
 	}
 	return nil
 }
