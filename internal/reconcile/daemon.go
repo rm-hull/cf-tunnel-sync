@@ -71,6 +71,8 @@ type Daemon struct {
 
 	// deferredPass tracks whether a deferred pass is already scheduled (R2).
 	deferredPass bool
+	// passWG tracks in-flight passes for graceful shutdown (R12).
+	passWG sync.WaitGroup
 }
 
 // NewDaemon creates a new Daemon.
@@ -186,16 +188,22 @@ func (d *Daemon) Run(ctx context.Context) {
 		d.log.Info("daemon stopped")
 	}()
 
-	// Run an initial reconciliation pass immediately on startup so that
-	// already-running labeled containers are reconciled without waiting
-	// for the first event or the resync timer.
+	// Run an initial reconciliation pass immediately on startup.
 	d.log.Info("running initial reconciliation pass")
-	go d.runPass(ctx)
+	d.startPass(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
 			d.log.Info("daemon shutting down")
+			// Wait for in-flight passes to complete (R12).
+			waited := make(chan struct{})
+			go func() { d.passWG.Wait(); close(waited) }()
+			select {
+			case <-waited:
+			case <-time.After(30 * time.Second):
+				d.log.Warn("timed out waiting for in-flight reconciliation pass")
+			}
 			d.stopCloudflared(ctx)
 			return
 
@@ -280,13 +288,9 @@ func (d *Daemon) Run(ctx context.Context) {
 				}
 			}
 			resyncTimer.Reset(d.cfg.ResyncInterval)
-
-			// Run pass asynchronously so the main loop stays responsive
-			// to Docker events, debounce, and SIGHUP.
-			go d.runPass(ctx)
+			d.startPass(ctx)
 
 		case <-d.externalTrigger:
-			// Reset resync timer immediately
 			if !resyncTimer.Stop() {
 				select {
 				case <-resyncTimer.C:
@@ -294,11 +298,18 @@ func (d *Daemon) Run(ctx context.Context) {
 				}
 			}
 			resyncTimer.Reset(d.cfg.ResyncInterval)
-
-			// Run pass asynchronously
-			go d.runPass(ctx)
+			d.startPass(ctx)
 		}
 	}
+}
+
+// startPass launches a reconciliation pass tracked by passWG (R12).
+func (d *Daemon) startPass(ctx context.Context) {
+	d.passWG.Add(1)
+	go func() {
+		defer d.passWG.Done()
+		d.runPass(ctx)
+	}()
 }
 
 // runPass executes a single reconciliation pass with backoff retry.

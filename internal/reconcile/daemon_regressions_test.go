@@ -1,6 +1,7 @@
 package reconcile_test
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -75,6 +76,50 @@ func TestDaemon_SnapshotConcurrentReadWhileEventsArrive(t *testing.T) {
 		}
 	}()
 	wg.Wait()
+}
+
+// R12 — Run does not wait for in-flight passes on shutdown
+func TestDaemon_ShutdownWaitsForInFlightPass(t *testing.T) {
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	var once sync.Once
+	t.Cleanup(func() { once.Do(func() { close(release) }) })
+
+	dockerAPI := newStubDocker()
+	dockerAPI.hook = func() {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		<-release // block the pass inside the engine
+	}
+	d := newTestDaemon(t, dockerAPI, setupFakeCF(t), reconcile.DaemonConfig{
+		Debounce: time.Hour, ResyncInterval: time.Hour,
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { d.Run(ctx); close(done) }()
+
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("initial pass never started")
+	}
+	cancel()
+
+	select {
+	case <-done:
+		t.Fatal("Run returned while a pass was still in flight")
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	once.Do(func() { close(release) })
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Run did not return after the in-flight pass finished")
+	}
 }
 
 // R13 — Negative MinimumInterval means no minimum
