@@ -467,6 +467,7 @@ func (e *Engine) convertDesired(desiredLabels map[string]labels.Rule) map[string
 }
 
 // ingressEqual compares two ingress configs (ignoring version).
+// It normalizes nil vs empty OriginRequest so they are treated as equal (R11).
 func ingressEqual(a, b []rules.IngressEntry) bool {
 	if len(a) != len(b) {
 		return false
@@ -479,6 +480,12 @@ func ingressEqual(a, b []rules.IngressEntry) bool {
 		}
 		ao := ae.OriginRequest
 		bo := be.OriginRequest
+		// R11: normalize nil vs empty OriginRequest
+		aoEmpty := ao == nil || (ao.NoTLSVerify == false && ao.OriginServerName == "")
+		boEmpty := bo == nil || (bo.NoTLSVerify == false && bo.OriginServerName == "")
+		if aoEmpty && boEmpty {
+			continue
+		}
 		if (ao == nil) != (bo == nil) {
 			return false
 		}
