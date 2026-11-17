@@ -194,10 +194,8 @@ func (d *Daemon) Run(ctx context.Context) {
 			}
 
 		case <-d.trigger:
-			// Run one reconciliation pass
-			d.runPass(ctx)
-
-			// Reset resync timer after each pass
+			// Reset resync timer immediately so the timer keeps ticking
+			// even if a pass is already running.
 			if !resyncTimer.Stop() {
 				select {
 				case <-resyncTimer.C:
@@ -205,12 +203,13 @@ func (d *Daemon) Run(ctx context.Context) {
 				}
 			}
 			resyncTimer.Reset(d.cfg.ResyncInterval)
+
+			// Run pass asynchronously so the main loop stays responsive
+			// to Docker events, debounce, and SIGHUP.
+			go d.runPass(ctx)
 
 		case <-d.externalTrigger:
-			// External trigger (SIGHUP) — also runs a pass
-			d.runPass(ctx)
-
-			// Reset resync timer after each pass
+			// Reset resync timer immediately
 			if !resyncTimer.Stop() {
 				select {
 				case <-resyncTimer.C:
@@ -218,6 +217,9 @@ func (d *Daemon) Run(ctx context.Context) {
 				}
 			}
 			resyncTimer.Reset(d.cfg.ResyncInterval)
+
+			// Run pass asynchronously
+			go d.runPass(ctx)
 		}
 	}
 }
