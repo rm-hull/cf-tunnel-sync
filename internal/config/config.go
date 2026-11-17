@@ -119,7 +119,7 @@ func Defaults() Config {
 		Reconcile: ReconcileConfig{
 			GracePeriod:     8 * time.Hour,
 			ResyncInterval:  5 * time.Minute,
-			Debounce:        30 * time.Second,
+			Debounce:        2 * time.Second,
 			MinimumInterval: 1 * time.Minute,
 		},
 		DNS: DNSConfig{

@@ -79,7 +79,7 @@ func NewDaemon(
 	dryRun bool,
 ) *Daemon {
 	if cfg.Debounce <= 0 {
-		cfg.Debounce = 30 * time.Second
+		cfg.Debounce = 2 * time.Second
 	}
 	if cfg.ResyncInterval <= 0 {
 		cfg.ResyncInterval = 5 * time.Minute

@@ -25,7 +25,7 @@ labels:
 reconcile:
   grace_period: 8h
   resync_interval: 5m
-  debounce: 30s
+  debounce: 2s
   minimum_interval: 1m
 
 dns:

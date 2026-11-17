@@ -34,7 +34,7 @@ func TestDefaults(t *testing.T) {
 
 	assert.Equal(t, 8*time.Hour, cfg.Reconcile.GracePeriod)
 	assert.Equal(t, 5*time.Minute, cfg.Reconcile.ResyncInterval)
-	assert.Equal(t, 30*time.Second, cfg.Reconcile.Debounce)
+	assert.Equal(t, 2*time.Second, cfg.Reconcile.Debounce)
 
 	assert.False(t, cfg.DNS.OverwriteConflicts)
 }
