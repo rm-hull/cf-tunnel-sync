@@ -36,7 +36,8 @@ type daemonCollector struct {
 	descTunnelID            *prometheus.Desc
 }
 
-func newDaemonCollector(daemon *reconcile.Daemon) *daemonCollector {
+func newDaemonCollector(daemon *reconcile.Daemon, passDurationHist prometheus.Histogram) *daemonCollector {
+	daemon.SetPassDurationObserver(passDurationHist.Observe)
 	return &daemonCollector{
 		daemon: daemon,
 		descPassCount: prometheus.NewDesc(
@@ -242,11 +243,24 @@ func (c *daemonCollector) Collect(ch chan<- prometheus.Metric) {
 // metrics with daemon-specific metrics.
 func newMetricsGatherer(daemon *reconcile.Daemon) prometheus.Gatherer {
 	reg := prometheus.NewRegistry()
+
+	passDurationHist := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Subsystem: "reconciler",
+		Name:      "pass_duration_seconds",
+		Help:      "Histogram of reconciliation pass duration in seconds.",
+		Buckets: []float64{
+			0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0,
+		},
+	})
+	reg.MustRegister(passDurationHist)
+
+	collector := newDaemonCollector(daemon, passDurationHist)
 	reg.MustRegister(
 		collectors.NewBuildInfoCollector(),
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		newDaemonCollector(daemon),
+		collector,
 	)
 	return reg
 }

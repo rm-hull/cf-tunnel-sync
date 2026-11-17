@@ -83,6 +83,8 @@ type Daemon struct {
 	passWG sync.WaitGroup
 	// lastEventTime tracks the last Docker event for leading-edge debounce.
 	lastEventTime time.Time
+	// passDurationObserver is called after each pass to record duration metrics.
+	passDurationObserver func(float64)
 }
 
 // NewDaemon creates a new Daemon.
@@ -167,6 +169,13 @@ func (d *Daemon) SetEventCounts(counts map[string]map[string]int) {
 			d.snap.EventCount += c
 		}
 	}
+}
+
+// SetPassDurationObserver sets a callback that is called after each reconciliation
+// pass with the pass duration in seconds. Used by the metrics package to record
+// pass duration in a Prometheus histogram.
+func (d *Daemon) SetPassDurationObserver(observer func(float64)) {
+	d.passDurationObserver = observer
 }
 
 // Run starts the daemon loop. It blocks until ctx is cancelled.
@@ -376,6 +385,11 @@ func (d *Daemon) runPass(ctx context.Context, skipMinInterval bool) {
 	res := d.eng.Run(ctx)
 
 	duration := time.Since(start)
+
+	// Record pass duration for histogram metrics (called once per pass).
+	if d.passDurationObserver != nil {
+		d.passDurationObserver(duration.Seconds())
+	}
 
 	// Fetch active connections from Cloudflare
 	connections := 0
