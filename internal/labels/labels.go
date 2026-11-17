@@ -101,6 +101,16 @@ func ParseOptionAllowUnprotectedAccess(allow bool) ParseOption {
 	}
 }
 
+// IsEnabled returns true if the value represents a truthy enable label.
+// It accepts "true", "1", "yes" (case-insensitive). (R10)
+func IsEnabled(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "yes":
+		return true
+	}
+	return false
+}
+
 // parseOpts applies functional options to default options.
 func parseOpts(opts ...ParseOption) ParseOptions {
 	o := ParseOptions{}

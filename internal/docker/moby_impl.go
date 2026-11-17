@@ -78,7 +78,7 @@ func (a *mobyAPI) DesiredRules(ctx context.Context, prefixes []string, allowUnpr
 	containerMap := make(map[string]Container)
 
 	for _, prefix := range prefixes {
-		containers, err := a.ListContainers(ctx, prefix+".enable=true")
+		containers, err := a.ListContainers(ctx, enableFilter(prefix))
 		if err != nil {
 			return nil, nil, fmt.Errorf("list containers for prefix %s: %w", prefix, err)
 		}
@@ -332,13 +332,17 @@ func (a *mobyAPI) FindContainerByName(ctx context.Context, name string) (Contain
 	}, nil
 }
 
+// enableFilter returns a Docker label filter that matches containers with
+// the enable label key present (key-only, R10). The value is checked later.
+func enableFilter(prefix string) string {
+	return prefix + ".enable"
+}
+
 // hasEnableLabel checks whether the event actor attributes contain any of the
-// label keys matching prefix+".enable". This is the client-side replacement for
-// Docker's server-side label filter, which ANDs multiple values and requires
-// exact key match.
+// label keys matching prefix+".enable" with a truthy value (R10).
 func hasEnableLabel(attrs map[string]string, prefixes []string) bool {
 	for _, p := range prefixes {
-		if _, ok := attrs[p+".enable"]; ok {
+		if v, ok := attrs[p+".enable"]; ok && labels.IsEnabled(v) {
 			return true
 		}
 	}
