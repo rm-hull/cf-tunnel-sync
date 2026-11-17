@@ -534,3 +534,50 @@ func Test_no_external_urls_in_html(t *testing.T) {
 		}
 	}
 }
+
+// Test_last_filter_excludes_http_server verifies the last template helper
+// excludes log events where component is http_server.
+func Test_last_filter_excludes_http_server(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	st := rules.NewState()
+	require.NoError(t, state.Save(statePath, st))
+
+	log, ring := logx.NewJSONLogger(slog.LevelInfo, 100)
+	cfAPI := cf.NewFake()
+
+	eng := reconcile.New(
+		log, nil, cfAPI, statePath, "test", []string{"cloudflare.tunnel"}, 8*time.Hour,
+	)
+	daemon := reconcile.NewDaemon(
+		log, eng, nil, cfAPI,
+		reconcile.DaemonConfig{Debounce: 2 * time.Second, ResyncInterval: 5 * time.Minute},
+		config.CloudflaredConfig{}, "", true,
+	)
+
+	// Create a child logger with component=http_server (mimics the web server setup)
+	httpLog := log.With("component", "http_server")
+	httpLog.Info("Incoming request", "method", "GET", "path", "/")
+	httpLog.Info("Incoming request", "method", "GET", "path", "/api")
+
+	// Log a non-http_server event
+	log.Info("Reconcile complete", "pass", 1)
+
+	server := NewServer(log, daemon, ring, cfAPI, statePath, Config{
+		Listen: ":0", DryRun: true, ResyncInterval: 5 * time.Minute,
+	})
+
+	req := newTestRequest("/")
+	rec := httptest.NewRecorder()
+	server.engine.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+
+	// The http_server events should be filtered out by the last helper
+	// so "Incoming request" should not appear in the Recent events section
+	assert.NotContains(t, body, "Incoming request", "http_server log events should be excluded from dashboard")
+
+	// The non-http_server event should appear
+	assert.Contains(t, body, "Reconcile complete", "non-http_server events should be visible")
+}

@@ -134,6 +134,8 @@ func TestRingBufferWithAttributes(t *testing.T) {
 	assert.Equal(t, "started", record["msg"])
 	// port is from the log call, so it should be in the record
 	assert.Equal(t, float64(5000), record["port"])
+	// service is from With(), so it should also be in the record
+	assert.Equal(t, "cf-tunnel-sync", record["service"])
 }
 
 func TestRingBufferWithGroup(t *testing.T) {

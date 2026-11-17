@@ -40,10 +40,17 @@ func (s *Server) handleIndex(c *gin.Context) {
 		"statusClass":     statusClass,
 		"statusLabel":     statusLabel,
 		"last": func(n int, items []LogEvent) []LogEvent {
-			if n >= len(items) {
-				return items
+			// Filter out http_server component noise
+			filtered := make([]LogEvent, 0, len(items))
+			for _, item := range items {
+				if comp, ok := item.Attrs["component"]; !ok || fmt.Sprintf("%v", comp) != "http_server" {
+					filtered = append(filtered, item)
+				}
 			}
-			return items[len(items)-n:]
+			if n >= len(filtered) {
+				return filtered
+			}
+			return filtered[len(filtered)-n:]
 		},
 	}
 

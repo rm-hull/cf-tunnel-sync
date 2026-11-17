@@ -23,8 +23,10 @@ type sharedBuffer struct {
 
 // RingBufferHandler wraps an slog.Handler and stores the last N records.
 type RingBufferHandler struct {
-	buf  *sharedBuffer
-	next slog.Handler
+	buf    *sharedBuffer
+	next   slog.Handler
+	attrs  []slog.Attr // accumulated attributes from WithAttrs
+	groups []string    // accumulated group names from WithGroup
 }
 
 // NewRingBufferHandler creates a handler that stores the last capacity records.
@@ -45,20 +47,23 @@ func (h *RingBufferHandler) Enabled(ctx context.Context, level slog.Level) bool 
 
 // Handle implements slog.Handler.
 func (h *RingBufferHandler) Handle(ctx context.Context, r slog.Record) error {
-	entries := make([]slog.Attr, 0, r.NumAttrs())
-	r.Attrs(func(a slog.Attr) bool {
-		entries = append(entries, a)
-		return true
-	})
-
+	// Include accumulated attributes from WithAttrs
 	record := map[string]any{
 		"time":  r.Time,
 		"level": r.Level,
 		"msg":   r.Message,
 	}
-	for _, a := range entries {
+
+	// Add pre-set attributes from With()
+	for _, a := range h.attrs {
 		record[a.Key] = resolveValue(a.Value)
 	}
+
+	// Add attributes from the record itself
+	r.Attrs(func(a slog.Attr) bool {
+		record[a.Key] = resolveValue(a.Value)
+		return true
+	})
 
 	data, err := json.Marshal(record)
 	if err != nil {
@@ -77,17 +82,27 @@ func (h *RingBufferHandler) Handle(ctx context.Context, r slog.Record) error {
 
 // WithAttrs implements slog.Handler.
 func (h *RingBufferHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	newAttrs := make([]slog.Attr, len(h.attrs)+len(attrs))
+	copy(newAttrs, h.attrs)
+	copy(newAttrs[len(h.attrs):], attrs)
 	return &RingBufferHandler{
-		buf:  h.buf,
-		next: h.next.WithAttrs(attrs),
+		buf:    h.buf,
+		next:   h.next.WithAttrs(attrs),
+		attrs:  newAttrs,
+		groups: h.groups,
 	}
 }
 
 // WithGroup implements slog.Handler.
 func (h *RingBufferHandler) WithGroup(name string) slog.Handler {
+	newGroups := make([]string, len(h.groups)+1)
+	copy(newGroups, h.groups)
+	newGroups[len(h.groups)] = name
 	return &RingBufferHandler{
-		buf:  h.buf,
-		next: h.next.WithGroup(name),
+		buf:    h.buf,
+		next:   h.next.WithGroup(name),
+		attrs:  h.attrs,
+		groups: newGroups,
 	}
 }
 

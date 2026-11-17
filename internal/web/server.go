@@ -70,7 +70,7 @@ func NewServer(
 	engine := gin.New()
 
 	s := &Server{
-		log:            log,
+		log:            log.With("component", "http_server"),
 		engine:         engine,
 		daemon:         daemon,
 		ring:           ring,
