@@ -65,6 +65,9 @@ type Daemon struct {
 	mu     sync.Mutex
 	snap   Snapshot
 	passMu sync.Mutex // ensures only one pass runs at a time
+
+	// deferredPass tracks whether a deferred pass is already scheduled (R2).
+	deferredPass bool
 }
 
 // NewDaemon creates a new Daemon.
@@ -146,8 +149,14 @@ func (d *Daemon) Run(ctx context.Context) {
 	prefixes := d.eng.Prefixes()
 	stream := d.dockerAPI.Events(ctx, prefixes)
 
-	// Debounce timer
+	// Debounce timer — created stopped; armed on first event (R2).
 	debounceTimer := time.NewTimer(d.cfg.Debounce)
+	if !debounceTimer.Stop() {
+		select {
+		case <-debounceTimer.C:
+		default:
+		}
+	}
 
 	// Resync timer
 	resyncTimer := time.NewTimer(d.cfg.ResyncInterval)
@@ -266,19 +275,27 @@ func (d *Daemon) runPass(ctx context.Context) {
 	d.passMu.Lock()
 	defer d.passMu.Unlock()
 
-	// Enforce minimum interval between passes
+	// Enforce minimum interval between passes — defer instead of drop (R2).
 	now := time.Now()
 	d.mu.Lock()
 	sinceLast := now.Sub(d.snap.LastPassTime)
-	d.mu.Unlock()
 	if d.cfg.MinimumInterval > 0 && sinceLast < d.cfg.MinimumInterval {
 		remaining := d.cfg.MinimumInterval - sinceLast
-		d.log.Debug("skipping pass — minimum interval not reached",
-			"since_last", sinceLast,
-			"remaining", remaining,
-		)
+		schedule := !d.deferredPass
+		d.deferredPass = true
+		d.mu.Unlock()
+		if schedule {
+			time.AfterFunc(remaining+time.Millisecond, func() {
+				d.mu.Lock()
+				d.deferredPass = false
+				d.mu.Unlock()
+				d.Trigger()
+			})
+		}
+		d.log.Debug("deferring pass — minimum interval not reached", "remaining", remaining)
 		return
 	}
+	d.mu.Unlock()
 
 	start := time.Now()
 
