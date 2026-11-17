@@ -9,6 +9,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R13 — Negative MinimumInterval means no minimum
+func TestNewDaemon_NegativeMinimumIntervalMeansNoMinimum(t *testing.T) {
+	d := newTestDaemon(t, newStubDocker(), setupFakeCF(t), reconcile.DaemonConfig{
+		Debounce: time.Hour, ResyncInterval: time.Hour, MinimumInterval: -time.Second,
+	})
+	runDaemon(t, d)
+	require.Eventually(t, func() bool { return d.Snapshot().PassCount >= 1 }, 2*time.Second, 10*time.Millisecond)
+
+	d.Trigger()
+
+	require.Eventually(t, func() bool { return d.Snapshot().PassCount >= 2 },
+		time.Second, 10*time.Millisecond, "negative MinimumInterval must not enforce a 1m gap")
+}
+
 // R2 — Passes skipped by MinimumInterval are dropped, not deferred
 func TestDaemon_EventWithinMinimumIntervalStillTriggersPass(t *testing.T) {
 	stream := newTestEventStream()

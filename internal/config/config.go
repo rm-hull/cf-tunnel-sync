@@ -317,6 +317,10 @@ func Validate(cfg *Config, searchedPaths []string) error {
 		errs = append(errs, "reconcile.debounce: must be >= 0")
 	}
 
+	if cfg.Reconcile.MinimumInterval < 0 {
+		errs = append(errs, "reconcile.minimum_interval: must be >= 0")
+	}
+
 	// Metrics port validation
 	if cfg.Tunnel.Cloudflared.MetricsPort < 1 || cfg.Tunnel.Cloudflared.MetricsPort > 65535 {
 		errs = append(errs, "tunnel.cloudflared.metrics_port: must be 1-65535")

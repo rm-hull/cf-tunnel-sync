@@ -94,7 +94,7 @@ func NewDaemon(
 		cfg.BackoffMax = 5 * time.Minute
 	}
 	if cfg.MinimumInterval < 0 {
-		cfg.MinimumInterval = 1 * time.Minute
+		cfg.MinimumInterval = 0
 	}
 	return &Daemon{
 		log:              log,

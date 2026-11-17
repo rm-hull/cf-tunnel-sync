@@ -293,6 +293,16 @@ func TestValidation(t *testing.T) {
 		assert.Contains(t, err.Error(), "reconcile.grace_period")
 	})
 
+	t.Run("negative minimum interval", func(t *testing.T) {
+		cfg := config.Defaults()
+		cfg.Cloudflare.APIToken = "test"
+		cfg.Cloudflare.AccountID = "test"
+		cfg.Reconcile.MinimumInterval = -1 * time.Second
+		err := config.Validate(&cfg, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "reconcile.minimum_interval")
+	})
+
 	t.Run("resync interval too short", func(t *testing.T) {
 		cfg := config.Defaults()
 		cfg.Cloudflare.APIToken = "test"
