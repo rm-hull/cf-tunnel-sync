@@ -64,7 +64,8 @@ type Daemon struct {
 	dryRun           bool
 
 	// Trigger channel for internal signals from the event loop.
-	trigger chan struct{}
+	// The bool value indicates whether to skip the minimum interval check.
+	trigger chan bool
 
 	// External trigger for SIGHUP or programmatic triggers.
 	externalTrigger chan struct{}
@@ -80,6 +81,8 @@ type Daemon struct {
 	consecutiveFailures int
 	// passWG tracks in-flight passes for graceful shutdown (R12).
 	passWG sync.WaitGroup
+	// lastEventTime tracks the last Docker event for leading-edge debounce.
+	lastEventTime time.Time
 }
 
 // NewDaemon creates a new Daemon.
@@ -123,7 +126,7 @@ func NewDaemon(
 		cloudflaredCfg:   cloudflaredCfg,
 		externalTunnelID: externalTunnelID,
 		dryRun:           dryRun,
-		trigger:          make(chan struct{}, 1),
+		trigger:          make(chan bool, 1),
 		externalTrigger:  make(chan struct{}, 1),
 		snap:             Snapshot{},
 	}
@@ -196,8 +199,8 @@ func (d *Daemon) Run(ctx context.Context) {
 	}()
 
 	// Run an initial reconciliation pass immediately on startup.
-	d.log.Info("running initial reconciliation pass")
-	d.startPass(ctx)
+	d.log.Debug("running initial reconciliation pass")
+	d.startPass(ctx, false)
 
 	for {
 		select {
@@ -242,18 +245,41 @@ func (d *Daemon) Run(ctx context.Context) {
 			}
 			d.snap.EventCounts[containerName][evt.Action]++
 			d.mu.Unlock()
-			if !debounceTimer.Stop() {
+			// Leading-edge debounce: if enough time has passed since the last event,
+			// trigger immediately and start a debounce window. If another event arrives
+			// during the window, reset the timer to coalesce the burst.
+			now := time.Now()
+			if now.Sub(d.lastEventTime) >= d.cfg.Debounce {
+				d.lastEventTime = now
+				// Trigger immediately on the leading edge
 				select {
-				case <-debounceTimer.C:
+				case d.trigger <- true: // Docker event: skip minimum interval
 				default:
 				}
+				// Arm the timer for burst coalescing — if more events arrive within
+				// the window, they'll reset it instead of triggering again.
+				if !debounceTimer.Stop() {
+					select {
+					case <-debounceTimer.C:
+					default:
+					}
+				}
+				debounceTimer.Reset(d.cfg.Debounce)
+			} else {
+				d.lastEventTime = now
+				if !debounceTimer.Stop() {
+					select {
+					case <-debounceTimer.C:
+					default:
+					}
+				}
+				debounceTimer.Reset(d.cfg.Debounce)
 			}
-			debounceTimer.Reset(d.cfg.Debounce)
 
 		case <-stream.Reconnected:
-			d.log.Info("docker event stream interrupted, triggering pass")
+			d.log.Debug("docker event stream interrupted, triggering pass")
 			select {
-			case d.trigger <- struct{}{}:
+			case d.trigger <- true: // Docker event: skip minimum interval
 			default:
 			}
 
@@ -271,21 +297,19 @@ func (d *Daemon) Run(ctx context.Context) {
 			d.Trigger()
 
 		case <-debounceTimer.C:
-			d.log.Info("debounce timer fired")
-			select {
-			case d.trigger <- struct{}{}:
-			default:
-			}
+			// Debounce window expired without new events — no action needed.
+			// The leading-edge trigger already fired when the first event arrived.
+			// This timer only exists to coalesce bursts by resetting on new events.
 
 		case <-resyncTimer.C:
-			d.log.Info("resync timer fired")
+			d.log.Debug("resync timer fired")
 			select {
-			case d.trigger <- struct{}{}:
+			case d.trigger <- false: // Resync: respect minimum interval
 			default:
 			}
 
-		case <-d.trigger:
-			d.log.Info("reconciliation trigger received, starting pass")
+		case skipMinInterval := <-d.trigger:
+			d.log.Debug("reconciliation trigger received, starting pass")
 			// Reset resync timer immediately so the timer keeps ticking
 			// even if a pass is already running.
 			if !resyncTimer.Stop() {
@@ -295,7 +319,7 @@ func (d *Daemon) Run(ctx context.Context) {
 				}
 			}
 			resyncTimer.Reset(d.cfg.ResyncInterval)
-			d.startPass(ctx)
+			d.startPass(ctx, skipMinInterval)
 
 		case <-d.externalTrigger:
 			if !resyncTimer.Stop() {
@@ -305,31 +329,31 @@ func (d *Daemon) Run(ctx context.Context) {
 				}
 			}
 			resyncTimer.Reset(d.cfg.ResyncInterval)
-			d.startPass(ctx)
+			d.startPass(ctx, false)
 		}
 	}
 }
 
 // startPass launches a reconciliation pass tracked by passWG (R12).
-func (d *Daemon) startPass(ctx context.Context) {
-	d.passWG.Add(1)
-	go func() {
-		defer d.passWG.Done()
-		d.runPass(ctx)
-	}()
+func (d *Daemon) startPass(ctx context.Context, skipMinInterval bool) {
+	d.passWG.Go(func() {
+		d.runPass(ctx, skipMinInterval)
+	})
 }
 
 // runPass executes a single reconciliation pass with backoff retry.
-// It enforces a minimum interval between passes to cap API call rates.
-func (d *Daemon) runPass(ctx context.Context) {
+// It enforces a minimum interval between passes to cap API call rates,
+// unless skipMinInterval is true (e.g., Docker event triggered the pass).
+func (d *Daemon) runPass(ctx context.Context, skipMinInterval bool) {
 	d.passMu.Lock()
 	defer d.passMu.Unlock()
 
 	// Enforce minimum interval between passes — defer instead of drop (R2).
+	// Docker event triggers bypass this check to respond immediately.
 	now := time.Now()
 	d.mu.Lock()
 	sinceLast := now.Sub(d.snap.LastPassTime)
-	if d.cfg.MinimumInterval > 0 && sinceLast < d.cfg.MinimumInterval {
+	if !skipMinInterval && d.cfg.MinimumInterval > 0 && sinceLast < d.cfg.MinimumInterval {
 		remaining := d.cfg.MinimumInterval - sinceLast
 		schedule := !d.deferredPass
 		d.deferredPass = true
@@ -421,7 +445,7 @@ func (d *Daemon) runPass(ctx context.Context) {
 				"duration", duration,
 			)
 		} else {
-			d.log.Debug("reconcile pass complete (no changes)",
+			d.log.Info("reconcile pass complete (no changes)",
 				"active", res.RulesActive,
 				"duration", duration,
 			)

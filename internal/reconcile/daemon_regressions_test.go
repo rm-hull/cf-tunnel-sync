@@ -167,8 +167,8 @@ func TestDaemon_BackoffUsesConsecutiveFailures(t *testing.T) {
 		300*time.Millisecond, 10*time.Millisecond, "retry delay must not depend on total pass count")
 }
 
-// R2 — Passes skipped by MinimumInterval are dropped, not deferred
-func TestDaemon_EventWithinMinimumIntervalStillTriggersPass(t *testing.T) {
+// R2 — Docker events should bypass MinimumInterval and trigger immediately.
+func TestDaemon_EventWithinMinimumIntervalTriggersImmediately(t *testing.T) {
 	stream := newTestEventStream()
 	dockerAPI := &fakeDockerWithEvents{API: docker.NewFake(), stream: stream}
 	d := newTestDaemon(t, dockerAPI, setupFakeCF(t), reconcile.DaemonConfig{
@@ -183,7 +183,10 @@ func TestDaemon_EventWithinMinimumIntervalStillTriggersPass(t *testing.T) {
 
 	stream.sendEventWithContainer("start", "whoami") // lands inside MinimumInterval
 
+	// The event should trigger immediately, not wait for the minimum interval to elapse.
+	// With a 400ms minimum interval, waiting 200ms should be enough for an immediate
+	// trigger, but too short for a deferred one.
 	require.Eventually(t, func() bool { return d.Snapshot().PassCount >= 2 },
-		3*time.Second, 20*time.Millisecond,
-		"event inside MinimumInterval must be deferred, not dropped")
+		200*time.Millisecond, 10*time.Millisecond,
+		"Docker event should bypass MinimumInterval and trigger immediately")
 }

@@ -520,8 +520,8 @@ func TestDaemon_snapshot_stats(t *testing.T) {
 	assert.Nil(t, snap.LastError, "snapshot should have no error after successful pass")
 }
 
-// TestDaemon_minimum_interval verifies that rapid triggers are deferred when
-// the minimum interval between passes has not elapsed, and eventually run.
+// TestDaemon_minimum_interval verifies that Docker events bypass the minimum
+// interval, while the minimum interval still applies to resync/retry triggers.
 func TestDaemon_minimum_interval(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stateDir := tempStateDirDaemon(t)
@@ -544,7 +544,7 @@ func TestDaemon_minimum_interval(t *testing.T) {
 		8*time.Hour,
 	)
 
-	// Minimum interval longer than debounce so we can verify deferral
+	// Minimum interval longer than debounce so we can verify bypass behavior
 	daemon := reconcile.NewDaemon(
 		testLoggerDaemon(),
 		eng,
@@ -575,22 +575,16 @@ func TestDaemon_minimum_interval(t *testing.T) {
 	snap := daemon.Snapshot()
 	assert.Equal(t, 2, snap.PassCount, "should have 2 passes (initial + event)")
 
-	// Send burst of events — all within minimum interval, should be deferred
+	// Send burst of events — all within minimum interval, but Docker events
+	// bypass the minimum interval. Debounce still coalesces the burst into one pass.
 	for range 3 {
 		stream.sendEvent("start")
 	}
-	time.Sleep(50 * time.Millisecond) // wait for debounce to fire (pass deferred)
+	time.Sleep(100 * time.Millisecond) // wait for debounce + pass
 
-	// Still 2 passes — burst was deferred, not dropped
+	// The burst should have triggered one pass immediately (bypassing minimum interval)
 	snap = daemon.Snapshot()
-	assert.Equal(t, 2, snap.PassCount, "burst should be deferred within minimum interval")
-
-	// Wait for minimum interval to elapse — the deferred pass should fire
-	time.Sleep(200 * time.Millisecond)
-
-	// The deferred pass should have run
-	snap = daemon.Snapshot()
-	assert.Equal(t, 3, snap.PassCount, "deferred pass should run after minimum interval elapses")
+	assert.Equal(t, 3, snap.PassCount, "Docker events should bypass minimum interval")
 
 	// Cancel to stop the daemon
 	cancel()
