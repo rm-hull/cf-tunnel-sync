@@ -132,22 +132,18 @@ func (a *mobyAPI) Events(ctx context.Context, prefixes []string) EventStream {
 	reconnectCh := make(chan struct{})
 	errCh := make(chan error)
 
-	// Build event filters for container actions.
+	// Build event filters for container start/die events.
 	// Only "start" and "die" matter: they change the set of running containers
 	// that DesiredRules queries. "stop" and "destroy" are redundant — "die" fires
 	// when a container exits, and DesiredRules only lists running containers.
+	//
+	// Do NOT filter by label here: Docker ANDs multiple label values and requires
+	// an exact key match, so client-side filtering is the only robust approach.
 	filters := mobyclient.Filters{}
 	filters = filters.Add("type", "container")
 	filters = filters.Add("event", "start", "die")
 
-	// Filter by label prefixes so we only receive events for containers
-	// that have our label keys (e.g., cloudflare.tunnel.enable=true).
-	// Docker ORs multiple values for the same filter key.
-	for _, prefix := range prefixes {
-		filters = filters.Add("label", prefix+".enable=true")
-	}
-
-	a.log.Debug("starting Docker events subscription", "filters", filters)
+	a.log.Info("starting docker events subscription", "filters", filters)
 
 	go func() {
 		a.log.Debug("events goroutine started")
@@ -174,12 +170,21 @@ func (a *mobyAPI) Events(ctx context.Context, prefixes []string) EventStream {
 					a.log.Debug("events messages channel closed by Docker client", "events_received", eventCount)
 					return
 				}
+
+				// Client-side label filter: Docker's server-side label filter
+				// ANDs multiple values and requires exact key match, so we filter
+				// here instead to support OR logic across prefixes.
+				if !hasEnableLabel(msg.Actor.Attributes, prefixes) {
+					continue
+				}
+
 				evt := Event{
 					Action: string(msg.Action),
 					ID:     msg.Actor.ID,
 					Actor:  msg.Actor.Attributes,
 				}
 				eventCount++
+
 				a.log.Info("received docker event from stream", "action", evt.Action, "id", evt.ID, "sequence", eventCount, "container", evt.Actor["name"])
 				evtCh <- evt
 			case err, ok := <-result.Err:
@@ -342,4 +347,17 @@ func (a *mobyAPI) FindContainerByName(ctx context.Context, name string) (Contain
 		State:   string(s.State),
 		Network: net,
 	}, nil
+}
+
+// hasEnableLabel checks whether the event actor attributes contain any of the
+// label keys matching prefix+".enable". This is the client-side replacement for
+// Docker's server-side label filter, which ANDs multiple values and requires
+// exact key match.
+func hasEnableLabel(attrs map[string]string, prefixes []string) bool {
+	for _, p := range prefixes {
+		if _, ok := attrs[p+".enable"]; ok {
+			return true
+		}
+	}
+	return false
 }
