@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"html/template"
 	"maps"
+	"mime"
 	"net/http"
+	"path"
 	"slices"
 	"strings"
 	"time"
@@ -106,11 +108,27 @@ func (s *Server) handleMetrics(c *gin.Context) {
 	handler.ServeHTTP(c.Writer, c.Request)
 }
 
-// handleCSS serves the embedded CSS with immutable cache headers.
-func (s *Server) handleCSS(c *gin.Context) {
-	c.Header("Content-Type", "text/css; charset=utf-8")
+// handleStatic serves embedded static files with immutable cache headers.
+func (s *Server) handleStatic(c *gin.Context) {
+	filePath := c.Param("filepath")
+	if filePath == "" {
+		filePath = "/"
+	}
+	// filePath includes the leading /, e.g. "/app.css" or "/favicon.svg"
+	// embed.FS paths don't have the leading slash
+	data, err := staticFS.ReadFile("static" + filePath)
+	if err != nil {
+		c.String(http.StatusNotFound, "not found")
+		return
+	}
+
+	contentType := mime.TypeByExtension(path.Ext(filePath))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	c.Header("Content-Type", contentType)
 	c.Header("Cache-Control", "public, max-age=31536000, immutable")
-	c.String(http.StatusOK, cssContent)
+	c.Data(http.StatusOK, contentType, data)
 }
 
 // formatDuration formats a duration for display.

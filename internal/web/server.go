@@ -25,8 +25,8 @@ import (
 //go:embed templates/*.html
 var templateFS embed.FS
 
-//go:embed static/app.css
-var cssContent string
+//go:embed static/*
+var staticFS embed.FS
 
 // Server holds the web server and its dependencies.
 type Server struct {
@@ -103,7 +103,7 @@ func (s *Server) setupRoutes() {
 	s.engine.GET("/api/status", s.handleStatusJSON)
 	s.engine.GET("/healthz", s.handleHealthz)
 	s.engine.GET("/readyz", s.handleReadyz)
-	s.engine.GET("/static/app.css", s.handleCSS)
+	s.engine.GET("/static/*filepath", s.handleStatic)
 
 	// Metrics — only if enabled
 	if s.metricsEnabled {

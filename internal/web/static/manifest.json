@@ -1,0 +1,16 @@
+{
+  "name": "cf-tunnel-sync",
+  "short_name": "cf-tunnel-sync",
+  "description": "Cloudflare Tunnel synchronization dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ]
+}
