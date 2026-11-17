@@ -90,41 +90,14 @@ func (a *mobyAPI) DesiredRules(ctx context.Context, prefixes []string, allowUnpr
 	}
 	a.log.Debug("collected containers", "containers", len(containerMap))
 
-	// Parse labels for each container.
-	var allIssues []labels.Issue
-	rules := make(map[string]labels.Rule)
-
-	// Build parse options
-	var parseOpts []labels.ParseOption
-	if allowUnprotected {
-		parseOpts = append(parseOpts, labels.ParseOptionAllowUnprotectedAccess(true))
+	// Merge rules with deterministic ordering (R6).
+	rules, issues := mergeDesiredRules(containerMap, prefixes, allowUnprotected)
+	for _, iss := range issues {
+		a.log.Debug("label parse issue", "container", iss.Container, "kind", iss.Kind, "detail", iss.Detail)
 	}
 
-	for _, c := range containerMap {
-		ruleList, issues := labels.Parse(c.Name, c.Labels, prefixes, parseOpts...)
-		for _, iss := range issues {
-			a.log.Debug("label parse issue", "container", c.Name, "kind", iss.Kind, "detail", iss.Detail)
-		}
-		allIssues = append(allIssues, issues...)
-		for _, r := range ruleList {
-			key := r.Key()
-			// First container by sorted name wins for duplicate keys.
-			if existing, ok := rules[key]; ok {
-				a.log.Debug("duplicate key conflict", "key", key, "existing", existing.ContainerName, "new", c.Name)
-				allIssues = append(allIssues, labels.Issue{
-					Kind:      "conflict",
-					Field:     "hostname",
-					Container: c.Name,
-					Detail:    fmt.Sprintf("duplicate key %q from %s and %s", key, existing.ContainerName, c.Name),
-				})
-				continue
-			}
-			rules[key] = r
-		}
-	}
-
-	a.log.Debug("desired rules discovered", "rules", len(rules), "issues", len(allIssues))
-	return rules, allIssues, nil
+	a.log.Debug("desired rules discovered", "rules", len(rules), "issues", len(issues))
+	return rules, issues, nil
 }
 
 func (a *mobyAPI) Events(ctx context.Context, prefixes []string) EventStream {
