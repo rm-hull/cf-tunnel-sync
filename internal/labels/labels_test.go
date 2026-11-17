@@ -14,13 +14,13 @@ import (
 func TestParse_whoami_cloudflare_tunnel(t *testing.T) {
 	labels := map[string]string{
 		"cloudflare.tunnel.enable":   "true",
-		"cloudflare.tunnel.hostname": "whoami.destructuring-bind.org",
+		"cloudflare.tunnel.hostname": "whoami.example.org",
 		"cloudflare.tunnel.service":  "http://whoami:80",
 	}
 	rules, issues := Parse("whoami", labels, []string{"cloudflare.tunnel"})
 
 	require.Len(t, rules, 1)
-	assert.Equal(t, "whoami.destructuring-bind.org", rules[0].Hostname)
+	assert.Equal(t, "whoami.example.org", rules[0].Hostname)
 	assert.Equal(t, "http://whoami:80", rules[0].Service)
 	assert.Empty(t, rules[0].Path)
 	assert.Empty(t, issues)
@@ -29,13 +29,13 @@ func TestParse_whoami_cloudflare_tunnel(t *testing.T) {
 func TestParse_vaultwarden_cloudflare_tunnel(t *testing.T) {
 	labels := map[string]string{
 		"cloudflare.tunnel.enable":   "true",
-		"cloudflare.tunnel.hostname": "vault.destructuring-bind.org",
+		"cloudflare.tunnel.hostname": "vault.example.org",
 		"cloudflare.tunnel.service":  "http://vaultwarden:80",
 	}
 	rules, issues := Parse("vaultwarden", labels, []string{"cloudflare.tunnel"})
 
 	require.Len(t, rules, 1)
-	assert.Equal(t, "vault.destructuring-bind.org", rules[0].Hostname)
+	assert.Equal(t, "vault.example.org", rules[0].Hostname)
 	assert.Equal(t, "http://vaultwarden:80", rules[0].Service)
 	assert.Empty(t, issues)
 }
@@ -43,13 +43,13 @@ func TestParse_vaultwarden_cloudflare_tunnel(t *testing.T) {
 func TestParse_cors_proxy_cloudflare_tunnel(t *testing.T) {
 	labels := map[string]string{
 		"cloudflare.tunnel.enable":   "true",
-		"cloudflare.tunnel.hostname": "cors-proxy.destructuring-bind.org",
+		"cloudflare.tunnel.hostname": "cors-proxy.example.org",
 		"cloudflare.tunnel.service":  "http://cors-proxy:8080",
 	}
 	rules, issues := Parse("cors-proxy", labels, []string{"cloudflare.tunnel"})
 
 	require.Len(t, rules, 1)
-	assert.Equal(t, "cors-proxy.destructuring-bind.org", rules[0].Hostname)
+	assert.Equal(t, "cors-proxy.example.org", rules[0].Hostname)
 	assert.Equal(t, "http://cors-proxy:8080", rules[0].Service)
 	assert.Empty(t, issues)
 }
@@ -61,13 +61,13 @@ func TestParse_cors_proxy_cloudflare_tunnel(t *testing.T) {
 func TestParse_whoami_dockflare(t *testing.T) {
 	labels := map[string]string{
 		"dockflare.enable":   "true",
-		"dockflare.hostname": "whoami.destructuring-bind.org",
+		"dockflare.hostname": "whoami.example.org",
 		"dockflare.service":  "http://whoami:80",
 	}
 	rules, issues := Parse("whoami", labels, []string{"dockflare"})
 
 	require.Len(t, rules, 1)
-	assert.Equal(t, "whoami.destructuring-bind.org", rules[0].Hostname)
+	assert.Equal(t, "whoami.example.org", rules[0].Hostname)
 	assert.Equal(t, "http://whoami:80", rules[0].Service)
 	assert.Empty(t, issues)
 }
@@ -79,7 +79,7 @@ func TestParse_whoami_dockflare(t *testing.T) {
 func TestParse_both_prefixes_priority_and_conflict(t *testing.T) {
 	labels := map[string]string{
 		"cloudflare.tunnel.enable":   "true",
-		"cloudflare.tunnel.hostname": "whoami.destructuring-bind.org",
+		"cloudflare.tunnel.hostname": "whoami.example.org",
 		"cloudflare.tunnel.service":  "http://whoami:80",
 		"dockflare.enable":           "true",
 		"dockflare.hostname":         "other.example.com", // different → conflict
@@ -89,7 +89,7 @@ func TestParse_both_prefixes_priority_and_conflict(t *testing.T) {
 
 	require.Len(t, rules, 1)
 	// cloudflare.tunnel has higher priority, so its hostname wins
-	assert.Equal(t, "whoami.destructuring-bind.org", rules[0].Hostname)
+	assert.Equal(t, "whoami.example.org", rules[0].Hostname)
 
 	// dockflare.hostname differs → conflict warning
 	require.Len(t, issues, 1)

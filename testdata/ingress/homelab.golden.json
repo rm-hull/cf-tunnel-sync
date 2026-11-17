@@ -1,14 +1,14 @@
 [
   {
-    "hostname": "cors-proxy.destructuring-bind.org",
+    "hostname": "cors-proxy.example.org",
     "service": "http://cors-proxy:8080"
   },
   {
-    "hostname": "vault.destructuring-bind.org",
+    "hostname": "vault.example.org",
     "service": "http://vaultwarden:80"
   },
   {
-    "hostname": "whoami.destructuring-bind.org",
+    "hostname": "whoami.example.org",
     "service": "http://whoami:80"
   },
   {

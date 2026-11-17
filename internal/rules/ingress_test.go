@@ -159,22 +159,22 @@ func TestRenderIngress_deterministic(t *testing.T) {
 func TestRenderIngress_golden(t *testing.T) {
 	now := time.Now()
 	rules := map[string]Rule{
-		"whoami.destructuring-bind.org": {
-			Hostname:  "whoami.destructuring-bind.org",
+		"whoami.example.org": {
+			Hostname:  "whoami.example.org",
 			Service:   "http://whoami:80",
 			Status:    "active",
 			FirstSeen: now,
 			LastSeen:  now,
 		},
-		"vault.destructuring-bind.org": {
-			Hostname:  "vault.destructuring-bind.org",
+		"vault.example.org": {
+			Hostname:  "vault.example.org",
 			Service:   "http://vaultwarden:80",
 			Status:    "active",
 			FirstSeen: now,
 			LastSeen:  now,
 		},
-		"cors-proxy.destructuring-bind.org": {
-			Hostname:  "cors-proxy.destructuring-bind.org",
+		"cors-proxy.example.org": {
+			Hostname:  "cors-proxy.example.org",
 			Service:   "http://cors-proxy:8080",
 			Status:    "active",
 			FirstSeen: now,
