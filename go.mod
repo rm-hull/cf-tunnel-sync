@@ -5,6 +5,7 @@ go 1.27
 require (
 	github.com/alecthomas/jsonschema v0.0.0-20220216202328-9eeeec9d044b
 	github.com/cloudflare/cloudflare-go v0.119.0
+	github.com/gertd/go-pluralize v0.2.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/jedib0t/go-pretty/v6 v6.9.2
 	github.com/joho/godotenv v1.5.1

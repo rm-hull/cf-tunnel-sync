@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gertd/go-pluralize"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	sloggin "github.com/samber/slog-gin"
@@ -430,9 +431,10 @@ func healthySentence(data StatusData) string {
 		return fmt.Sprintf("Tunnel %s is running with no active routes.", data.Tunnel.Name)
 	}
 
+	pl := pluralize.NewClient()
 	parts := []string{fmt.Sprintf("Tunnel %s is healthy", data.Tunnel.Name)}
 	if active > 0 {
-		parts = append(parts, fmt.Sprintf("%d routes live", active))
+		parts = append(parts, fmt.Sprintf("%d %s live", active, pl.Pluralize("route", active, false)))
 	}
 	if pending > 0 {
 		// Find the shortest pending time
