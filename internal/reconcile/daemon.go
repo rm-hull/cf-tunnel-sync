@@ -189,7 +189,6 @@ func (d *Daemon) Run(ctx context.Context) {
 			}
 			d.snap.EventCounts[containerName][evt.Action]++
 			d.mu.Unlock()
-			d.log.Debug("docker event", "action", evt.Action, "container", containerName)
 			if !debounceTimer.Stop() {
 				// Timer already fired; drain the channel
 				select {
@@ -210,6 +209,7 @@ func (d *Daemon) Run(ctx context.Context) {
 			d.log.Error("docker event stream error", "error", err)
 
 		case <-debounceTimer.C:
+			d.log.Info("debounce timer fired")
 			select {
 			case d.trigger <- struct{}{}:
 			default:
@@ -223,6 +223,7 @@ func (d *Daemon) Run(ctx context.Context) {
 			}
 
 		case <-d.trigger:
+			d.log.Info("reconciliation trigger received, starting pass")
 			// Reset resync timer immediately so the timer keeps ticking
 			// even if a pass is already running.
 			if !resyncTimer.Stop() {

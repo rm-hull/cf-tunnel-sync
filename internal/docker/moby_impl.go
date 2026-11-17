@@ -138,7 +138,7 @@ func (a *mobyAPI) Events(ctx context.Context, prefixes []string) EventStream {
 	// when a container exits, and DesiredRules only lists running containers.
 	filters := mobyclient.Filters{}
 	filters = filters.Add("type", "container")
-	filters = filters.Add("action", "start", "die")
+	filters = filters.Add("event", "start", "die")
 
 	// Filter by label prefixes so we only receive events for containers
 	// that have our label keys (e.g., cloudflare.tunnel.enable=true).
@@ -180,7 +180,7 @@ func (a *mobyAPI) Events(ctx context.Context, prefixes []string) EventStream {
 					Actor:  msg.Actor.Attributes,
 				}
 				eventCount++
-				a.log.Debug("received Docker event", "action", evt.Action, "id", evt.ID, "sequence", eventCount)
+				a.log.Info("received docker event from stream", "action", evt.Action, "id", evt.ID, "sequence", eventCount, "container", evt.Actor["name"])
 				evtCh <- evt
 			case err, ok := <-result.Err:
 				if !ok {
