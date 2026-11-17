@@ -53,6 +53,9 @@ type Engine struct {
 
 	// DNS conflict handling
 	overwriteConflicts bool
+
+	// Allow unprotected access (R7)
+	allowUnprotectedAccess bool
 }
 
 // Option configures the Engine.
@@ -77,6 +80,13 @@ func WithCloudflared(cfg config.CloudflaredConfig, externalID string) Option {
 func WithOverwriteConflicts(overwrite bool) Option {
 	return func(e *Engine) {
 		e.overwriteConflicts = overwrite
+	}
+}
+
+// WithAllowUnprotectedAccess allows rules that reference Access-protected zones.
+func WithAllowUnprotectedAccess(allow bool) Option {
+	return func(e *Engine) {
+		e.allowUnprotectedAccess = allow
 	}
 }
 
@@ -149,7 +159,7 @@ func (e *Engine) Run(ctx context.Context) Result {
 	}
 
 	// 3. Discover desired rules from Docker
-	desiredLabels, issues, err := e.dockerAPI.DesiredRules(ctx, e.prefixes, false)
+	desiredLabels, issues, err := e.dockerAPI.DesiredRules(ctx, e.prefixes, e.allowUnprotectedAccess)
 	if err != nil {
 		res.LastError = err
 		e.log.Error("discover rules", "error", err)

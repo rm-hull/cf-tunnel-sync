@@ -53,6 +53,7 @@ func NewReconcileCmd() *cobra.Command {
 				reconcile.WithDryRun(dryRun || cfg.Server.DryRun),
 				reconcile.WithCloudflared(cfg.Tunnel.Cloudflared, cfg.Tunnel.ExternalID),
 				reconcile.WithOverwriteConflicts(cfg.DNS.OverwriteConflicts),
+				reconcile.WithAllowUnprotectedAccess(cfg.Labels.AllowUnprotectedAccess),
 			)
 
 			res := eng.Run(cmd.Context())
