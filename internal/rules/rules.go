@@ -41,13 +41,13 @@ func (r Rule) IsExpired(now time.Time) bool {
 }
 
 // applyDesired updates the rule's fields from the desired rule and sets LastSeen.
-// If the rule was pending, it transitions back to active.
+// It always resets the status to "active" and clears pending fields, regardless of
+// the previous status (e.g., dns_error, dns_conflict). Those statuses are informational
+// and recomputed from scratch each pass.
 func (r Rule) applyDesired(desired Rule, now time.Time) Rule {
-	if r.Status == "pending" {
-		r.Status = "active"
-		r.PendingSince = nil
-		r.DeleteAfter = nil
-	}
+	r.Status = "active"
+	r.PendingSince = nil
+	r.DeleteAfter = nil
 	r.Hostname = desired.Hostname
 	r.Path = desired.Path
 	r.Service = desired.Service

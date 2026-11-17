@@ -186,6 +186,25 @@ func TestApply_state_roundtrip(t *testing.T) {
 	_ = state2
 }
 
+// TestApply_DesiredRuleResetsDNSStatusToActive tests that when a rule with dns_error
+// status reappears in desired, it is reset to active and rendered in ingress.
+func TestApply_DesiredRuleResetsDNSStatusToActive(t *testing.T) {
+	now := time.Now()
+	st := NewState()
+	st.Rules["app.example.com"] = Rule{
+		Hostname: "app.example.com", Service: "http://app:80",
+		Status: "dns_error", FirstSeen: now.Add(-time.Hour), LastSeen: now.Add(-time.Minute),
+	}
+	desired := map[string]Rule{
+		"app.example.com": {Hostname: "app.example.com", Service: "http://app:80", Status: "active"},
+	}
+
+	_, active, _, _ := Apply(st, desired, now, time.Hour)
+
+	assert.Equal(t, "active", active["app.example.com"].Status)
+	assert.Len(t, RenderIngress(active), 2, "route + catch-all must be rendered")
+}
+
 // TestApply_no_expiry_before_delete_after tests that pending rules don't expire before deleteAfter.
 func TestApply_no_expiry_before_delete_after(t *testing.T) {
 	now := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
