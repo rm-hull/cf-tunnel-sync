@@ -566,9 +566,14 @@ func TestDaemon_minimum_interval(t *testing.T) {
 		close(done)
 	}()
 
-	// Send first event — should trigger a pass after debounce
+	// Wait for minimum interval to elapse after initial pass, then send event
+	time.Sleep(160 * time.Millisecond)
 	stream.sendEvent("start")
 	time.Sleep(100 * time.Millisecond) // wait for debounce + pass
+
+	// Should have 2 passes: initial + first event-triggered
+	snap := daemon.Snapshot()
+	assert.Equal(t, 2, snap.PassCount, "should have 2 passes (initial + event)")
 
 	// Send burst of events — all within minimum interval, should be skipped
 	for range 3 {
@@ -576,9 +581,9 @@ func TestDaemon_minimum_interval(t *testing.T) {
 	}
 	time.Sleep(50 * time.Millisecond) // wait for debounce to fire (pass skipped)
 
-	// Verify only 1 pass so far
-	snap := daemon.Snapshot()
-	assert.Equal(t, 1, snap.PassCount, "should have 1 pass before interval elapses")
+	// Still 2 passes — burst was skipped
+	snap = daemon.Snapshot()
+	assert.Equal(t, 2, snap.PassCount, "burst should be skipped within minimum interval")
 
 	// Wait for minimum interval to elapse
 	time.Sleep(150 * time.Millisecond)
@@ -591,9 +596,9 @@ func TestDaemon_minimum_interval(t *testing.T) {
 	cancel()
 	<-done
 
-	// Should have 2 passes: first + one after interval elapsed
+	// Should have 3 passes: initial + first event + after interval elapsed
 	snap = daemon.Snapshot()
-	assert.Equal(t, 2, snap.PassCount, "should run 2 passes (first + after interval)")
+	assert.Equal(t, 3, snap.PassCount, "should run 3 passes (initial + event + after interval)")
 }
 
 // TestDaemon_minimum_interval_disabled verifies that when MinimumInterval is 0,
@@ -653,8 +658,8 @@ func TestDaemon_minimum_interval_disabled(t *testing.T) {
 	cancel()
 	<-done
 
-	// Both passes should have run (no minimum interval)
-	assert.Equal(t, 2, cfAPI.IngressGetCalls, "should run 2 passes when minimum interval is disabled")
+	// Should have 3 passes: initial + 2 event-triggered (no minimum interval)
+	assert.Equal(t, 3, cfAPI.IngressGetCalls, "should run 3 passes when minimum interval is disabled")
 }
 
 // failingCFWrapper wraps cf.Fake and fails the first N FindTunnel calls.
@@ -746,6 +751,62 @@ func TestDaemon_event_counts(t *testing.T) {
 
 	assert.NotNil(t, snap.EventCounts["nginx"], "nginx should have event counts")
 	assert.Equal(t, 1, snap.EventCounts["nginx"]["start"], "nginx should have 1 start event")
+}
+
+// TestDaemon_initial_pass_on_startup verifies that the daemon runs a
+// reconciliation pass immediately on startup, before waiting for events
+// or timers.
+func TestDaemon_initial_pass_on_startup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stateDir := tempStateDirDaemon(t)
+	statePath := filepath.Join(stateDir, "state.json")
+
+	cfAPI := setupFakeCFDaemon(t)
+	stream := newTestEventStream()
+	dockerAPI := &fakeDockerWithEvents{
+		API:    docker.NewFake(),
+		stream: stream,
+	}
+
+	eng := reconcile.New(
+		testLoggerDaemon(),
+		dockerAPI,
+		cfAPI,
+		statePath,
+		"homelab",
+		[]string{"cloudflare.tunnel"},
+		8*time.Hour,
+	)
+
+	daemon := reconcile.NewDaemon(
+		testLoggerDaemon(),
+		eng,
+		dockerAPI,
+		cfAPI,
+		reconcile.DaemonConfig{
+			Debounce:        5 * time.Second,
+			ResyncInterval:  5 * time.Minute,
+			MinimumInterval: 0,
+		},
+		config.CloudflaredConfig{},
+		"",
+		false,
+	)
+
+	done := make(chan struct{})
+	go func() {
+		daemon.Run(ctx)
+		close(done)
+	}()
+
+	// Cancel almost immediately — no events sent, no timers should fire.
+	// If the initial pass runs, PassCount should be >= 1.
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	<-done
+
+	snap := daemon.Snapshot()
+	assert.GreaterOrEqual(t, snap.PassCount, 1, "initial pass should run on startup")
 }
 
 // TestDaemon_setEventCounts verifies the SetEventCounts helper correctly

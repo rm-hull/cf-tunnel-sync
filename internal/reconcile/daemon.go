@@ -158,6 +158,12 @@ func (d *Daemon) Run(ctx context.Context) {
 		d.log.Info("daemon stopped")
 	}()
 
+	// Run an initial reconciliation pass immediately on startup so that
+	// already-running labeled containers are reconciled without waiting
+	// for the first event or the resync timer.
+	d.log.Info("running initial reconciliation pass")
+	go d.runPass(ctx)
+
 	for {
 		select {
 		case <-ctx.Done():
