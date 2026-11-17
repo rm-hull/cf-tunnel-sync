@@ -223,19 +223,21 @@ func (e *Engine) Run(ctx context.Context) Result {
 
 	// 8. Handle expired rules: delete DNS and remove from state
 	for key, rule := range expired {
-		e.deleteDNSIfOrphaned(ctx, tunnel.ID, rule)
+		e.deleteDNSIfOrphaned(ctx, tunnel.ID, rule, active)
 		delete(st.Rules, key)
 	}
 
-	// 9. Persist state
-	st.Tunnel = rules.TunnelInfo{
-		ID:   tunnel.ID,
-		Name: tunnel.Name,
-	}
-	if err := state.Save(e.statePath, st); err != nil {
-		res.LastError = err
-		e.log.Error("save state", "error", err)
-		return res
+	// 9. Persist state (skip in dry-run mode, R5c)
+	if !e.dryRun {
+		st.Tunnel = rules.TunnelInfo{
+			ID:   tunnel.ID,
+			Name: tunnel.Name,
+		}
+		if err := state.Save(e.statePath, st); err != nil {
+			res.LastError = err
+			e.log.Error("save state", "error", err)
+			return res
+		}
 	}
 
 	duration := time.Since(start)
@@ -381,7 +383,18 @@ func (e *Engine) ensureDNS(ctx context.Context, tunnelID string, rule rules.Rule
 }
 
 // deleteDNSIfOrphaned deletes DNS for expired rules if safe.
-func (e *Engine) deleteDNSIfOrphaned(ctx context.Context, tunnelID string, rule rules.Rule) {
+// It keeps DNS if another active rule shares the same hostname (R5a)
+// and retries failed deletes (R5b).
+func (e *Engine) deleteDNSIfOrphaned(ctx context.Context, tunnelID string, rule rules.Rule, active map[string]rules.Rule) {
+	// R5a: keep DNS if another active rule uses the same hostname
+	for _, a := range active {
+		if a.Hostname == rule.Hostname {
+			e.log.Debug("keeping dns — hostname shared with active rule",
+				"hostname", rule.Hostname, "active_container", a.ContainerName)
+			return
+		}
+	}
+
 	zoneID, err := e.cfAPI.ResolveZone(ctx, rule.Hostname, rule.ZoneName, "")
 	if err != nil {
 		return
@@ -399,8 +412,14 @@ func (e *Engine) deleteDNSIfOrphaned(ctx context.Context, tunnelID string, rule 
 				e.log.Info("would_delete_dns", "hostname", rule.Hostname)
 				return
 			}
+			// R5b: retry failed delete once
 			if err := e.cfAPI.DeleteDNSRecord(ctx, rec.ID); err != nil {
-				e.log.Warn("dns delete failed", "hostname", rule.Hostname, "error", err)
+				e.log.Debug("dns delete failed, retrying", "hostname", rule.Hostname, "error", err)
+				if err2 := e.cfAPI.DeleteDNSRecord(ctx, rec.ID); err2 != nil {
+					e.log.Warn("dns delete failed after retry", "hostname", rule.Hostname, "error", err2)
+				} else {
+					e.log.Info("dns deleted (after retry)", "hostname", rule.Hostname)
+				}
 			} else {
 				e.log.Info("dns deleted", "hostname", rule.Hostname)
 			}
