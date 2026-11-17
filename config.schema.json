@@ -168,7 +168,8 @@
       "required": [
         "grace_period",
         "resync_interval",
-        "debounce"
+        "debounce",
+        "minimum_interval"
       ],
       "properties": {
         "grace_period": {
@@ -187,6 +188,12 @@
           "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
           "type": "string",
           "description": "Debounce window for Docker events; burst events produce one pass (e.g., 2s).",
+          "format": "duration"
+        },
+        "minimum_interval": {
+          "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "description": "Minimum time between reconciliation passes; caps max pass rate (e.g., 1m).",
           "format": "duration"
         }
       },
@@ -436,7 +443,8 @@
           "required": [
             "grace_period",
             "resync_interval",
-            "debounce"
+            "debounce",
+            "minimum_interval"
           ],
           "properties": {
             "grace_period": {
@@ -455,6 +463,12 @@
               "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
               "type": "string",
               "description": "Debounce window for Docker events; burst events produce one pass (e.g., 2s).",
+              "format": "duration"
+            },
+            "minimum_interval": {
+              "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+              "type": "string",
+              "description": "Minimum time between reconciliation passes; caps max pass rate (e.g., 1m).",
               "format": "duration"
             }
           },
@@ -535,7 +549,8 @@
       "required": [
         "grace_period",
         "resync_interval",
-        "debounce"
+        "debounce",
+        "minimum_interval"
       ],
       "properties": {
         "grace_period": {
@@ -554,6 +569,12 @@
           "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
           "type": "string",
           "description": "Debounce window for Docker events; burst events produce one pass (e.g., 2s).",
+          "format": "duration"
+        },
+        "minimum_interval": {
+          "pattern": "^([0-9]+(?:\\.[0-9]+)?(?:ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "description": "Minimum time between reconciliation passes; caps max pass rate (e.g., 1m).",
           "format": "duration"
         }
       },

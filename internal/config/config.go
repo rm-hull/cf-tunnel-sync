@@ -71,9 +71,10 @@ type LabelsConfig struct {
 
 // ReconcileConfig holds reconciliation settings.
 type ReconcileConfig struct {
-	GracePeriod    time.Duration `yaml:"grace_period" json:"grace_period" descr:"Time to wait before removing a rule after its container disappears (e.g., 8h)."`
-	ResyncInterval time.Duration `yaml:"resync_interval" json:"resync_interval" descr:"Interval between full reconciliation passes (e.g., 5m)."`
-	Debounce       time.Duration `yaml:"debounce" json:"debounce" descr:"Debounce window for Docker events; burst events produce one pass (e.g., 2s)."`
+	GracePeriod     time.Duration `yaml:"grace_period" json:"grace_period" descr:"Time to wait before removing a rule after its container disappears (e.g., 8h)."`
+	ResyncInterval  time.Duration `yaml:"resync_interval" json:"resync_interval" descr:"Interval between full reconciliation passes (e.g., 5m)."`
+	Debounce        time.Duration `yaml:"debounce" json:"debounce" descr:"Debounce window for Docker events; burst events produce one pass (e.g., 2s)."`
+	MinimumInterval time.Duration `yaml:"minimum_interval" json:"minimum_interval" descr:"Minimum time between reconciliation passes; caps max pass rate (e.g., 1m)."`
 }
 
 // DNSConfig holds DNS settings.
@@ -116,9 +117,10 @@ func Defaults() Config {
 			AllowUnprotectedAccess: false,
 		},
 		Reconcile: ReconcileConfig{
-			GracePeriod:    8 * time.Hour,
-			ResyncInterval: 5 * time.Minute,
-			Debounce:       2 * time.Second,
+			GracePeriod:     8 * time.Hour,
+			ResyncInterval:  5 * time.Minute,
+			Debounce:        30 * time.Second,
+			MinimumInterval: 1 * time.Minute,
 		},
 		DNS: DNSConfig{
 			OverwriteConflicts: false,

@@ -103,8 +103,9 @@ func TestDaemon_debounce_burst(t *testing.T) {
 		dockerAPI,
 		cfAPI,
 		reconcile.DaemonConfig{
-			Debounce:       100 * time.Millisecond,
-			ResyncInterval: 5 * time.Minute,
+			Debounce:        100 * time.Millisecond,
+			ResyncInterval:  5 * time.Minute,
+			MinimumInterval: 0,
 		},
 		config.CloudflaredConfig{},
 		"",
@@ -163,8 +164,9 @@ func TestDaemon_resync_interval(t *testing.T) {
 		dockerAPI,
 		cfAPI,
 		reconcile.DaemonConfig{
-			Debounce:       50 * time.Millisecond,
-			ResyncInterval: 100 * time.Millisecond,
+			Debounce:        50 * time.Millisecond,
+			ResyncInterval:  100 * time.Millisecond,
+			MinimumInterval: 0,
 		},
 		config.CloudflaredConfig{},
 		"",
@@ -224,10 +226,11 @@ func TestDaemon_backoff_on_failure(t *testing.T) {
 		dockerAPI,
 		failingCF,
 		reconcile.DaemonConfig{
-			Debounce:       50 * time.Millisecond,
-			ResyncInterval: 5 * time.Minute,
-			BackoffInitial: 10 * time.Millisecond, // fast backoff for testing
-			BackoffMax:     500 * time.Millisecond,
+			Debounce:        50 * time.Millisecond,
+			ResyncInterval:  5 * time.Minute,
+			BackoffInitial:  10 * time.Millisecond, // fast backoff for testing
+			BackoffMax:      500 * time.Millisecond,
+			MinimumInterval: 0,
 		},
 		config.CloudflaredConfig{},
 		"",
@@ -283,8 +286,9 @@ func TestDaemon_reconnect_forces_pass(t *testing.T) {
 		dockerAPI,
 		cfAPI,
 		reconcile.DaemonConfig{
-			Debounce:       50 * time.Millisecond,
-			ResyncInterval: 5 * time.Minute,
+			Debounce:        50 * time.Millisecond,
+			ResyncInterval:  5 * time.Minute,
+			MinimumInterval: 0,
 		},
 		config.CloudflaredConfig{},
 		"",
@@ -343,8 +347,9 @@ func TestDaemon_graceful_shutdown(t *testing.T) {
 		dockerAPI,
 		cfAPI,
 		reconcile.DaemonConfig{
-			Debounce:       50 * time.Millisecond,
-			ResyncInterval: 5 * time.Minute,
+			Debounce:        50 * time.Millisecond,
+			ResyncInterval:  5 * time.Minute,
+			MinimumInterval: 0,
 		},
 		config.CloudflaredConfig{},
 		"",
@@ -413,8 +418,9 @@ func TestDaemon_sighup_trigger(t *testing.T) {
 		dockerAPI,
 		cfAPI,
 		reconcile.DaemonConfig{
-			Debounce:       50 * time.Millisecond,
-			ResyncInterval: 5 * time.Minute,
+			Debounce:        50 * time.Millisecond,
+			ResyncInterval:  5 * time.Minute,
+			MinimumInterval: 0,
 		},
 		config.CloudflaredConfig{},
 		"",
@@ -474,8 +480,9 @@ func TestDaemon_snapshot_stats(t *testing.T) {
 		dockerAPI,
 		cfAPI,
 		reconcile.DaemonConfig{
-			Debounce:       50 * time.Millisecond,
-			ResyncInterval: 5 * time.Minute,
+			Debounce:        50 * time.Millisecond,
+			ResyncInterval:  5 * time.Minute,
+			MinimumInterval: 0,
 		},
 		config.CloudflaredConfig{},
 		"",
@@ -504,6 +511,143 @@ func TestDaemon_snapshot_stats(t *testing.T) {
 	assert.GreaterOrEqual(t, snap.PassCount, 1, "snapshot should show at least 1 pass")
 	assert.True(t, snap.LastDuration > 0, "snapshot should record pass duration")
 	assert.Nil(t, snap.LastError, "snapshot should have no error after successful pass")
+}
+
+// TestDaemon_minimum_interval verifies that rapid triggers are skipped when
+// the minimum interval between passes has not elapsed.
+func TestDaemon_minimum_interval(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stateDir := tempStateDirDaemon(t)
+	statePath := filepath.Join(stateDir, "state.json")
+
+	cfAPI := setupFakeCFDaemon(t)
+	stream := newTestEventStream()
+	dockerAPI := &fakeDockerWithEvents{
+		API:    docker.NewFake(),
+		stream: stream,
+	}
+
+	eng := reconcile.New(
+		testLoggerDaemon(),
+		dockerAPI,
+		cfAPI,
+		statePath,
+		"homelab",
+		[]string{"cloudflare.tunnel"},
+		8*time.Hour,
+	)
+
+	// Minimum interval longer than debounce so we can verify skipping
+	daemon := reconcile.NewDaemon(
+		testLoggerDaemon(),
+		eng,
+		dockerAPI,
+		cfAPI,
+		reconcile.DaemonConfig{
+			Debounce:        20 * time.Millisecond,
+			ResyncInterval:  5 * time.Minute,
+			MinimumInterval: 150 * time.Millisecond,
+		},
+		config.CloudflaredConfig{},
+		"",
+		false,
+	)
+
+	done := make(chan struct{})
+	go func() {
+		daemon.Run(ctx)
+		close(done)
+	}()
+
+	// Send first event — should trigger a pass after debounce
+	stream.sendEvent("start")
+	time.Sleep(100 * time.Millisecond) // wait for debounce + pass
+
+	// Send burst of events — all within minimum interval, should be skipped
+	for range 3 {
+		stream.sendEvent("start")
+	}
+	time.Sleep(50 * time.Millisecond) // wait for debounce to fire (pass skipped)
+
+	// Verify only 1 pass so far
+	snap := daemon.Snapshot()
+	assert.Equal(t, 1, snap.PassCount, "should have 1 pass before interval elapses")
+
+	// Wait for minimum interval to elapse
+	time.Sleep(150 * time.Millisecond)
+
+	// Send event after interval — should trigger a new pass
+	stream.sendEvent("start")
+	time.Sleep(100 * time.Millisecond) // wait for debounce + pass
+
+	// Cancel to stop the daemon
+	cancel()
+	<-done
+
+	// Should have 2 passes: first + one after interval elapsed
+	snap = daemon.Snapshot()
+	assert.Equal(t, 2, snap.PassCount, "should run 2 passes (first + after interval)")
+}
+
+// TestDaemon_minimum_interval_disabled verifies that when MinimumInterval is 0,
+// passes are not rate-limited.
+func TestDaemon_minimum_interval_disabled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stateDir := tempStateDirDaemon(t)
+	statePath := filepath.Join(stateDir, "state.json")
+
+	cfAPI := setupFakeCFDaemon(t)
+	stream := newTestEventStream()
+	dockerAPI := &fakeDockerWithEvents{
+		API:    docker.NewFake(),
+		stream: stream,
+	}
+
+	eng := reconcile.New(
+		testLoggerDaemon(),
+		dockerAPI,
+		cfAPI,
+		statePath,
+		"homelab",
+		[]string{"cloudflare.tunnel"},
+		8*time.Hour,
+	)
+
+	daemon := reconcile.NewDaemon(
+		testLoggerDaemon(),
+		eng,
+		dockerAPI,
+		cfAPI,
+		reconcile.DaemonConfig{
+			Debounce:        50 * time.Millisecond,
+			ResyncInterval:  5 * time.Minute,
+			MinimumInterval: 0, // disabled
+		},
+		config.CloudflaredConfig{},
+		"",
+		false,
+	)
+
+	done := make(chan struct{})
+	go func() {
+		daemon.Run(ctx)
+		close(done)
+	}()
+
+	// Send event, wait for debounce + pass
+	stream.sendEvent("start")
+	time.Sleep(150 * time.Millisecond)
+
+	// Send another event immediately — should NOT be skipped (interval disabled)
+	stream.sendEvent("start")
+	time.Sleep(150 * time.Millisecond)
+
+	// Cancel to stop the daemon
+	cancel()
+	<-done
+
+	// Both passes should have run (no minimum interval)
+	assert.Equal(t, 2, cfAPI.IngressGetCalls, "should run 2 passes when minimum interval is disabled")
 }
 
 // failingCFWrapper wraps cf.Fake and fails the first N FindTunnel calls.

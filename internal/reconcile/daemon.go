@@ -13,10 +13,11 @@ import (
 
 // DaemonConfig holds the configuration for the daemon loop.
 type DaemonConfig struct {
-	Debounce       time.Duration
-	ResyncInterval time.Duration
-	BackoffInitial time.Duration
-	BackoffMax     time.Duration
+	Debounce        time.Duration
+	ResyncInterval  time.Duration
+	BackoffInitial  time.Duration
+	BackoffMax      time.Duration
+	MinimumInterval time.Duration
 }
 
 // Snapshot holds the current state of the daemon for status reporting.
@@ -33,6 +34,7 @@ type Snapshot struct {
 	RulesConflict int
 	CFStats       cf.Stats
 	EventCount    int
+	LastPassTime  time.Time
 }
 
 // Daemon orchestrates the event-driven reconciliation loop.
@@ -74,7 +76,7 @@ func NewDaemon(
 	dryRun bool,
 ) *Daemon {
 	if cfg.Debounce <= 0 {
-		cfg.Debounce = 2 * time.Second
+		cfg.Debounce = 30 * time.Second
 	}
 	if cfg.ResyncInterval <= 0 {
 		cfg.ResyncInterval = 5 * time.Minute
@@ -84,6 +86,9 @@ func NewDaemon(
 	}
 	if cfg.BackoffMax <= 0 {
 		cfg.BackoffMax = 5 * time.Minute
+	}
+	if cfg.MinimumInterval < 0 {
+		cfg.MinimumInterval = 1 * time.Minute
 	}
 	return &Daemon{
 		log:              log,
@@ -216,9 +221,24 @@ func (d *Daemon) Run(ctx context.Context) {
 }
 
 // runPass executes a single reconciliation pass with backoff retry.
+// It enforces a minimum interval between passes to cap API call rates.
 func (d *Daemon) runPass(ctx context.Context) {
 	d.passMu.Lock()
 	defer d.passMu.Unlock()
+
+	// Enforce minimum interval between passes
+	now := time.Now()
+	d.mu.Lock()
+	sinceLast := now.Sub(d.snap.LastPassTime)
+	d.mu.Unlock()
+	if d.cfg.MinimumInterval > 0 && sinceLast < d.cfg.MinimumInterval {
+		remaining := d.cfg.MinimumInterval - sinceLast
+		d.log.Debug("skipping pass — minimum interval not reached",
+			"since_last", sinceLast,
+			"remaining", remaining,
+		)
+		return
+	}
 
 	start := time.Now()
 
@@ -245,6 +265,7 @@ func (d *Daemon) runPass(ctx context.Context) {
 	d.snap.RulesExpired = res.RulesExpired
 	d.snap.RulesConflict = res.RulesConflict
 	d.snap.Connections = connections
+	d.snap.LastPassTime = start
 	if res.Tunnel.ID != "" {
 		d.snap.TunnelID = res.Tunnel.ID
 		d.snap.TunnelName = res.Tunnel.Name
