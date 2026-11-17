@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"log/slog"
+	"maps"
 	"sync"
 	"time"
 
@@ -13,13 +14,13 @@ import (
 
 // DaemonConfig holds the configuration for the daemon loop.
 type DaemonConfig struct {
-	Debounce                  time.Duration
-	ResyncInterval            time.Duration
-	BackoffInitial            time.Duration
-	BackoffMax                time.Duration
-	MinimumInterval           time.Duration
-	ReconnectBackoffInitial   time.Duration
-	ReconnectBackoffMax       time.Duration
+	Debounce                time.Duration
+	ResyncInterval          time.Duration
+	BackoffInitial          time.Duration
+	BackoffMax              time.Duration
+	MinimumInterval         time.Duration
+	ReconnectBackoffInitial time.Duration
+	ReconnectBackoffMax     time.Duration
 }
 
 // Snapshot holds the current state of the daemon for status reporting.
@@ -133,7 +134,14 @@ func (d *Daemon) Trigger() {
 func (d *Daemon) Snapshot() Snapshot {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return d.snap
+	s := d.snap
+	if d.snap.EventCounts != nil {
+		s.EventCounts = make(map[string]map[string]int, len(d.snap.EventCounts))
+		for k, v := range d.snap.EventCounts {
+			s.EventCounts[k] = maps.Clone(v)
+		}
+	}
+	return s
 }
 
 // SetEventCounts injects event counts into the snapshot for testing.

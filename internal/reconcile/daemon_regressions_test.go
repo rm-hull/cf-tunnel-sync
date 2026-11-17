@@ -1,6 +1,8 @@
 package reconcile_test
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,6 +25,56 @@ func TestDaemon_ReconnectIsRateLimited(t *testing.T) {
 
 	assert.LessOrEqual(t, cd.calls.Load(), int64(3),
 		"Events() was called %d times in 300ms: reconnect must back off", cd.calls.Load())
+}
+
+// R4 — Snapshot() shares EventCounts with the writer (data race)
+func TestDaemon_SnapshotIsIsolatedFromLaterEvents(t *testing.T) {
+	stream := newTestEventStream()
+	dockerAPI := &fakeDockerWithEvents{API: docker.NewFake(), stream: stream}
+	d := newTestDaemon(t, dockerAPI, setupFakeCF(t), reconcile.DaemonConfig{
+		Debounce: time.Hour, ResyncInterval: time.Hour,
+	})
+	runDaemon(t, d)
+
+	stream.sendEventWithContainer("start", "whoami")
+	require.Eventually(t, func() bool { return d.Snapshot().EventCounts["whoami"]["start"] == 1 },
+		2*time.Second, 5*time.Millisecond)
+	snap := d.Snapshot()
+
+	stream.sendEventWithContainer("start", "whoami")
+	require.Eventually(t, func() bool { return d.Snapshot().EventCounts["whoami"]["start"] == 2 },
+		2*time.Second, 5*time.Millisecond)
+
+	assert.Equal(t, 1, snap.EventCounts["whoami"]["start"],
+		"an earlier snapshot must not change when new events arrive")
+}
+
+func TestDaemon_SnapshotConcurrentReadWhileEventsArrive(t *testing.T) {
+	stream := newTestEventStream()
+	dockerAPI := &fakeDockerWithEvents{API: docker.NewFake(), stream: stream}
+	d := newTestDaemon(t, dockerAPI, setupFakeCF(t), reconcile.DaemonConfig{
+		Debounce: time.Hour, ResyncInterval: time.Hour,
+	})
+	runDaemon(t, d)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { // writer: events for several containers
+		defer wg.Done()
+		for i := 0; i < 300; i++ {
+			stream.sendEventWithContainer("start", fmt.Sprintf("c%d", i%5))
+		}
+	}()
+	go func() { // reader: what the metrics handler does
+		defer wg.Done()
+		for i := 0; i < 300; i++ {
+			for _, actions := range d.Snapshot().EventCounts {
+				for range actions {
+				}
+			}
+		}
+	}()
+	wg.Wait()
 }
 
 // R13 — Negative MinimumInterval means no minimum
