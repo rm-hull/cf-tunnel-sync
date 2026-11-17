@@ -136,6 +136,37 @@ func TestNewDaemon_NegativeMinimumIntervalMeansNoMinimum(t *testing.T) {
 		time.Second, 10*time.Millisecond, "negative MinimumInterval must not enforce a 1m gap")
 }
 
+// R9 — Retry backoff uses total pass count
+func TestDaemon_BackoffUsesConsecutiveFailures(t *testing.T) {
+	cfAPI := &flakyCF{Fake: setupFakeCF(t)}
+	d := newTestDaemon(t, newStubDocker(), cfAPI, reconcile.DaemonConfig{
+		Debounce: time.Hour, ResyncInterval: time.Hour, MinimumInterval: 0,
+		BackoffInitial: 20 * time.Millisecond, BackoffMax: 10 * time.Second,
+	})
+	runDaemon(t, d)
+
+	// Five healthy passes.
+	require.Eventually(t, func() bool { return d.Snapshot().PassCount >= 1 }, 2*time.Second, 10*time.Millisecond)
+	for i := 2; i <= 5; i++ {
+		d.Trigger()
+		want := i
+		require.Eventually(t, func() bool { return d.Snapshot().PassCount >= want }, 2*time.Second, 10*time.Millisecond)
+	}
+
+	// One failing pass (#6), then recover.
+	cfAPI.failFindTunnel.Store(true)
+	d.Trigger()
+	require.Eventually(t, func() bool {
+		s := d.Snapshot()
+		return s.PassCount >= 6 && s.LastError != nil
+	}, 2*time.Second, 10*time.Millisecond)
+	cfAPI.failFindTunnel.Store(false)
+
+	// First failure => retry after BackoffInitial (20ms), not 20ms*2^5 = 640ms.
+	require.Eventually(t, func() bool { return d.Snapshot().PassCount >= 7 },
+		300*time.Millisecond, 10*time.Millisecond, "retry delay must not depend on total pass count")
+}
+
 // R2 — Passes skipped by MinimumInterval are dropped, not deferred
 func TestDaemon_EventWithinMinimumIntervalStillTriggersPass(t *testing.T) {
 	stream := newTestEventStream()

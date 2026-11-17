@@ -71,6 +71,8 @@ type Daemon struct {
 
 	// deferredPass tracks whether a deferred pass is already scheduled (R2).
 	deferredPass bool
+	// consecutiveFailures tracks consecutive failures for backoff (R9).
+	consecutiveFailures int
 	// passWG tracks in-flight passes for graceful shutdown (R12).
 	passWG sync.WaitGroup
 }
@@ -374,18 +376,20 @@ func (d *Daemon) runPass(ctx context.Context) {
 	d.mu.Unlock()
 
 	if res.LastError != nil {
+		d.consecutiveFailures++
 		d.log.Warn("reconcile pass failed",
 			"error", res.LastError,
 			"duration", duration,
-			"backoff", backoffFor(d.cfg, d.snap.PassCount),
+			"backoff", backoffFor(d.cfg, d.consecutiveFailures),
 		)
-		// Schedule retry with backoff
-		retryAfter := backoffFor(d.cfg, d.snap.PassCount)
+		// Schedule retry with backoff based on consecutive failures (R9)
+		retryAfter := backoffFor(d.cfg, d.consecutiveFailures)
 		d.log.Info("retrying in", "after", retryAfter)
 		time.AfterFunc(retryAfter, func() {
 			d.Trigger()
 		})
 	} else {
+		d.consecutiveFailures = 0
 		// Log at INFO only when something changed, DEBUG otherwise
 		hasChanges := res.RulesAdded > 0 || res.RulesUpdated > 0 || res.DNSCreated > 0 ||
 			res.DNSUpdated > 0 || res.IngressUpdated
