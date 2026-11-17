@@ -166,6 +166,14 @@ func statusClass(status string) string {
 		return "warn"
 	case "dns_conflict":
 		return "bad"
+	case "dns_error":
+		return "bad"
+	case "invalid":
+		return "bad"
+	case "conflict":
+		return "bad"
+	case "blocked":
+		return "warn"
 	default:
 		return ""
 	}
@@ -180,6 +188,14 @@ func statusLabel(status string) string {
 		return "Pending removal"
 	case "dns_conflict":
 		return "DNS conflict"
+	case "dns_error":
+		return "DNS error"
+	case "invalid":
+		return "Invalid"
+	case "conflict":
+		return "Conflict"
+	case "blocked":
+		return "Blocked"
 	default:
 		return status
 	}

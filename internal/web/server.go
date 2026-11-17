@@ -330,6 +330,14 @@ func countRules(rules map[string]rules.Rule) RuleCounts {
 			counts.Pending++
 		case "dns_conflict":
 			counts.DNSConflict++
+		case "dns_error":
+			counts.Error++
+		case "invalid":
+			counts.Invalid++
+		case "conflict":
+			counts.Conflict++
+		case "blocked":
+			counts.Blocked++
 		}
 	}
 	return counts

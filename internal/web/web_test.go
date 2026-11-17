@@ -374,6 +374,10 @@ func Test_statusClass(t *testing.T) {
 	assert.Equal(t, "ok", statusClass("active"))
 	assert.Equal(t, "warn", statusClass("pending"))
 	assert.Equal(t, "bad", statusClass("dns_conflict"))
+	assert.Equal(t, "bad", statusClass("dns_error"))
+	assert.Equal(t, "bad", statusClass("invalid"))
+	assert.Equal(t, "bad", statusClass("conflict"))
+	assert.Equal(t, "warn", statusClass("blocked"))
 	assert.Equal(t, "", statusClass("unknown"))
 }
 
@@ -382,6 +386,10 @@ func Test_statusLabel(t *testing.T) {
 	assert.Equal(t, "Active", statusLabel("active"))
 	assert.Equal(t, "Pending removal", statusLabel("pending"))
 	assert.Equal(t, "DNS conflict", statusLabel("dns_conflict"))
+	assert.Equal(t, "DNS error", statusLabel("dns_error"))
+	assert.Equal(t, "Invalid", statusLabel("invalid"))
+	assert.Equal(t, "Conflict", statusLabel("conflict"))
+	assert.Equal(t, "Blocked", statusLabel("blocked"))
 }
 
 // Test_csp_on_all_routes verifies CSP header is present on all routes.
