@@ -140,9 +140,16 @@ func (e *Engine) Run(ctx context.Context) Result {
 	// 2. Find or create tunnel
 	tunnel, err := e.ensureTunnel(ctx)
 	if err != nil {
-		res.LastError = err
-		e.log.Error("ensure tunnel", "error", err)
-		return res
+		if e.dryRun {
+			// R15: dry-run doesn't error when tunnel is missing
+			res.PlannedActions = append(res.PlannedActions, "would_create_tunnel")
+			e.log.Info("would_create_tunnel", "name", e.tunnelName)
+			// Continue with empty tunnel ID; ingress/DNS will be no-ops in dry-run
+		} else {
+			res.LastError = err
+			e.log.Error("ensure tunnel", "error", err)
+			return res
+		}
 	}
 	res.Tunnel = tunnel
 
