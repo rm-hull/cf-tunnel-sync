@@ -390,6 +390,17 @@ func buildRule(containerName string, pdList []prefixData, index *int, opt ParseO
 		})
 	}
 
+	// Validate path (R8): must be valid regex if present
+	if pathVal.value != "" {
+		if _, err := regexp.Compile(pathVal.value); err != nil {
+			return nil, append(issues, Issue{
+				Kind:   "invalid",
+				Field:  "path",
+				Detail: fmt.Sprintf("invalid path regex %q: %v", pathVal.value, err),
+			})
+		}
+	}
+
 	// Validate service scheme
 	if !validateService(serviceVal.value) {
 		return nil, append(issues, Issue{
@@ -475,8 +486,22 @@ func validateService(s string) bool {
 	}
 	if idx := strings.Index(s, "://"); idx > 0 {
 		scheme := s[:idx]
-		_, ok := allowedSchemes[scheme]
-		return ok
+		if _, ok := allowedSchemes[scheme]; !ok {
+			return false
+		}
+		// R8: service URL must have a host (non-empty after ://)
+		rest := s[idx+3:]
+		if rest == "" {
+			return false
+		}
+		// Strip port if present
+		host := rest
+		if colonIdx := strings.Index(rest, ":"); colonIdx > 0 {
+			host = rest[:colonIdx]
+		} else if slashIdx := strings.Index(rest, "/"); slashIdx > 0 {
+			host = rest[:slashIdx]
+		}
+		return host != ""
 	}
 	return false
 }

@@ -630,3 +630,34 @@ func TestRule_Key_no_path(t *testing.T) {
 	r := Rule{Hostname: "App.Example.COM"}
 	assert.Equal(t, "app.example.com", r.Key())
 }
+
+// ---------------------------------------------------------------------------
+// R8 — Invalid path regex and service URL without host are rejected
+// ---------------------------------------------------------------------------
+
+func TestParse_invalid_path_regex(t *testing.T) {
+	labels := map[string]string{
+		"cloudflare.tunnel.enable":   "true",
+		"cloudflare.tunnel.hostname": "app.example.com",
+		"cloudflare.tunnel.service":  "http://app:80",
+		"cloudflare.tunnel.path":     "[invalid",
+	}
+	rules, issues := Parse("app", labels, []string{"cloudflare.tunnel"})
+	assert.Empty(t, rules)
+	require.Len(t, issues, 1)
+	assert.Equal(t, "invalid", issues[0].Kind)
+	assert.Equal(t, "path", issues[0].Field)
+}
+
+func TestParse_service_without_host(t *testing.T) {
+	labels := map[string]string{
+		"cloudflare.tunnel.enable":   "true",
+		"cloudflare.tunnel.hostname": "app.example.com",
+		"cloudflare.tunnel.service":  "http://",
+	}
+	rules, issues := Parse("app", labels, []string{"cloudflare.tunnel"})
+	assert.Empty(t, rules)
+	require.Len(t, issues, 1)
+	assert.Equal(t, "invalid", issues[0].Kind)
+	assert.Equal(t, "service", issues[0].Field)
+}
