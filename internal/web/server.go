@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net"
 	"net/http"
@@ -419,20 +420,26 @@ func buildRecentEvents(records []json.RawMessage) []LogEvent {
 }
 
 // healthySentence generates the status sentence for the page.
-func healthySentence(data StatusData) string {
+// The tunnel name is wrapped in <strong> tags for bold display.
+func healthySentence(data StatusData) template.HTML {
+	name := template.HTMLEscapeString(data.Tunnel.Name)
+	boldName := "<strong>" + name + "</strong>"
 	if data.Reconcile.LastError != "" {
-		return fmt.Sprintf("Tunnel %s has errors: %s.", data.Tunnel.Name, data.Reconcile.LastError)
+		errMsg := template.HTMLEscapeString(data.Reconcile.LastError)
+		// #nosec G203 -- name and errMsg are escaped via template.HTMLEscapeString
+		return template.HTML(fmt.Sprintf("Tunnel %s has errors: %s.", boldName, errMsg))
 	}
 
 	active := data.Counts.Active
 	pending := data.Counts.Pending
 
 	if active == 0 && pending == 0 {
-		return fmt.Sprintf("Tunnel %s is running with no active routes.", data.Tunnel.Name)
+		// #nosec G203 -- name is escaped via template.HTMLEscapeString
+		return template.HTML(fmt.Sprintf("Tunnel %s is running with no active routes.", boldName))
 	}
 
 	pl := pluralize.NewClient()
-	parts := []string{fmt.Sprintf("Tunnel %s is healthy", data.Tunnel.Name)}
+	parts := []string{fmt.Sprintf("Tunnel %s is healthy", boldName)}
 	if active > 0 {
 		parts = append(parts, fmt.Sprintf("%d %s live", active, pl.Pluralize("route", active, false)))
 	}
@@ -462,5 +469,6 @@ func healthySentence(data StatusData) string {
 		}
 	}
 
-	return strings.Join(parts, ", ") + "."
+	// #nosec G203 -- all dynamic content is escaped via template.HTMLEscapeString
+	return template.HTML(strings.Join(parts, ", ") + ".")
 }

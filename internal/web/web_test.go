@@ -334,7 +334,7 @@ func Test_healthySentence(t *testing.T) {
 				Tunnel: TunnelStatus{Name: "homelab"},
 				Counts: RuleCounts{Active: 3},
 			},
-			expected: "Tunnel homelab is healthy, 3 routes live.",
+			expected: "Tunnel <strong>homelab</strong> is healthy, 3 routes live.",
 		},
 		{
 			name: "healthy with pending rules",
@@ -342,7 +342,7 @@ func Test_healthySentence(t *testing.T) {
 				Tunnel: TunnelStatus{Name: "homelab"},
 				Counts: RuleCounts{Active: 2, Pending: 1},
 			},
-			expected: "Tunnel homelab is healthy, 2 routes live, 1 pending removal.",
+			expected: "Tunnel <strong>homelab</strong> is healthy, 2 routes live, 1 pending removal.",
 		},
 		{
 			name: "error state",
@@ -350,21 +350,21 @@ func Test_healthySentence(t *testing.T) {
 				Tunnel:    TunnelStatus{Name: "homelab"},
 				Reconcile: ReconcileStatus{LastError: "connection refused"},
 			},
-			expected: "Tunnel homelab has errors: connection refused.",
+			expected: "Tunnel <strong>homelab</strong> has errors: connection refused.",
 		},
 		{
 			name: "no rules",
 			data: StatusData{
 				Tunnel: TunnelStatus{Name: "homelab"},
 			},
-			expected: "Tunnel homelab is running with no active routes.",
+			expected: "Tunnel <strong>homelab</strong> is running with no active routes.",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := healthySentence(tt.data)
-			assert.Equal(t, tt.expected, result)
+			assert.Equal(t, tt.expected, string(result))
 		})
 	}
 }
