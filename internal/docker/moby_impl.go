@@ -129,7 +129,7 @@ func (a *mobyAPI) DesiredRules(ctx context.Context, prefixes []string, allowUnpr
 
 func (a *mobyAPI) Events(ctx context.Context, prefixes []string) EventStream {
 	evtCh := make(chan Event)
-	reconnectCh := make(chan struct{})
+	reconnectCh := make(chan struct{}, 1)
 	errCh := make(chan error)
 
 	// Build event filters for container start/die events.
@@ -186,14 +186,24 @@ func (a *mobyAPI) Events(ctx context.Context, prefixes []string) EventStream {
 				eventCount++
 
 				a.log.Info("received docker event from stream", "action", evt.Action, "id", evt.ID, "sequence", eventCount, "container", evt.Actor["name"])
-				evtCh <- evt
+				select {
+				case evtCh <- evt:
+				case <-ctx.Done():
+					a.log.Debug("events context cancelled while sending event", "error", ctx.Err())
+					return
+				}
 			case err, ok := <-result.Err:
 				if !ok {
 					a.log.Debug("events error channel closed by Docker client", "events_received", eventCount)
 					return
 				}
 				a.log.Debug("Docker events stream error", "error", err, "events_received", eventCount)
-				errCh <- err
+				select {
+				case errCh <- err:
+				case <-ctx.Done():
+					a.log.Debug("events context cancelled while sending error", "error", ctx.Err())
+					return
+				}
 				// Signal reconnection needed
 				select {
 				case reconnectCh <- struct{}{}:
