@@ -24,21 +24,23 @@
         <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-warn/20 text-warn dark:text-warn-dark">DRY RUN</span>
         {{end}}
       </div>
-      <p class="text-base text-gray-600 dark:text-gray-400 flex items-center gap-2">
+      <div class="flex items-start gap-2">
         {{if .Reconcile.LastError}}
-        <svg class="w-5 h-5 text-bad dark:text-bad-dark flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="w-5 h-5 mt-0.5 text-bad dark:text-bad-dark flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
           <line x1="12" y1="8" x2="12" y2="12"/>
           <line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         {{else}}
-        <svg class="w-5 h-5 text-ok dark:text-ok-dark flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="w-5 h-5 mt-0.5 text-ok dark:text-ok-dark flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
           <path d="M9 12l2 2 4-4"/>
         </svg>
         {{end}}
-        {{healthySentence .}}
-      </p>
+        <p class="text-base text-gray-600 dark:text-gray-400 flex-1">
+          {{healthySentence .}}
+        </p>
+      </div>
     </header>
 
     <!-- Stats strip -->
