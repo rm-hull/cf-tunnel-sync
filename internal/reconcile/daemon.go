@@ -130,7 +130,9 @@ func NewDaemon(
 		dryRun:           dryRun,
 		trigger:          make(chan bool, 1),
 		externalTrigger:  make(chan struct{}, 1),
-		snap:             Snapshot{},
+		snap: Snapshot{
+			TunnelName: eng.TunnelName(),
+		},
 	}
 }
 
@@ -169,6 +171,13 @@ func (d *Daemon) SetEventCounts(counts map[string]map[string]int) {
 			d.snap.EventCount += c
 		}
 	}
+}
+
+// SetPassCount injects a pass count into the snapshot for testing.
+func (d *Daemon) SetPassCount(count int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.snap.PassCount = count
 }
 
 // SetPassDurationObserver sets a callback that is called after each reconciliation

@@ -93,6 +93,11 @@ func newTestServer(t *testing.T, opts ...func(*testServerOpts)) *Server {
 
 	server := NewServer(log, daemon, ring, cfAPI, statePath, cfg)
 
+	// Simulate completed reconcile passes so the status page shows healthy state
+	if optCfg.passCount > 0 {
+		daemon.SetPassCount(optCfg.passCount)
+	}
+
 	// Inject test event counts so metrics endpoint has data
 	if optCfg.metricsEnabled {
 		daemon.SetEventCounts(map[string]map[string]int{
@@ -107,11 +112,18 @@ func newTestServer(t *testing.T, opts ...func(*testServerOpts)) *Server {
 type testServerOpts struct {
 	metricsEnabled bool
 	dryRun         bool
+	passCount      int
 }
 
 func withMetrics() func(*testServerOpts) {
 	return func(o *testServerOpts) {
 		o.metricsEnabled = true
+	}
+}
+
+func withPassCount(count int) func(*testServerOpts) {
+	return func(o *testServerOpts) {
+		o.passCount = count
 	}
 }
 
@@ -123,7 +135,7 @@ func newTestRequest(path string) *http.Request {
 
 // Test_index_healthy verifies the HTML status page returns 200 with correct content.
 func Test_index_healthy(t *testing.T) {
-	server := newTestServer(t)
+	server := newTestServer(t, withPassCount(1))
 
 	req := newTestRequest("/")
 	rec := httptest.NewRecorder()
@@ -345,16 +357,18 @@ func Test_healthySentence(t *testing.T) {
 		{
 			name: "healthy with active rules",
 			data: StatusData{
-				Tunnel: TunnelStatus{Name: "homelab"},
-				Counts: RuleCounts{Active: 3},
+				Tunnel:    TunnelStatus{Name: "homelab"},
+				Reconcile: ReconcileStatus{Count: 1},
+				Counts:    RuleCounts{Active: 3},
 			},
 			expected: "Tunnel <strong>homelab</strong> is healthy, 3 routes live.",
 		},
 		{
 			name: "healthy with pending rules",
 			data: StatusData{
-				Tunnel: TunnelStatus{Name: "homelab"},
-				Counts: RuleCounts{Active: 2, Pending: 1},
+				Tunnel:    TunnelStatus{Name: "homelab"},
+				Reconcile: ReconcileStatus{Count: 1},
+				Counts:    RuleCounts{Active: 2, Pending: 1},
 			},
 			expected: "Tunnel <strong>homelab</strong> is healthy, 2 routes live, 1 pending removal.",
 		},
@@ -362,14 +376,22 @@ func Test_healthySentence(t *testing.T) {
 			name: "error state",
 			data: StatusData{
 				Tunnel:    TunnelStatus{Name: "homelab"},
-				Reconcile: ReconcileStatus{LastError: "connection refused"},
+				Reconcile: ReconcileStatus{Count: 1, LastError: "connection refused"},
 			},
 			expected: "Tunnel <strong>homelab</strong> has errors: connection refused.",
 		},
 		{
-			name: "no rules",
+			name: "initializing (no reconcile yet)",
 			data: StatusData{
 				Tunnel: TunnelStatus{Name: "homelab"},
+			},
+			expected: "Tunnel <strong>homelab</strong> is initializing, please wait...",
+		},
+		{
+			name: "no rules after reconcile",
+			data: StatusData{
+				Tunnel:    TunnelStatus{Name: "homelab"},
+				Reconcile: ReconcileStatus{Count: 1},
 			},
 			expected: "Tunnel <strong>homelab</strong> is running with no active routes.",
 		},

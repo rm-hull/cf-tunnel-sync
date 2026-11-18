@@ -121,6 +121,11 @@ func (e *Engine) Prefixes() []string {
 	return e.prefixes
 }
 
+// TunnelName returns the configured tunnel name.
+func (e *Engine) TunnelName() string {
+	return e.tunnelName
+}
+
 // Run executes one reconciliation pass per §6.7.
 func (e *Engine) Run(ctx context.Context) Result {
 	start := time.Now()

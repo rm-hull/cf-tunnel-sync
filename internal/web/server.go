@@ -432,6 +432,13 @@ func buildRecentEvents(records []json.RawMessage) []LogEvent {
 func healthySentence(data StatusData) template.HTML {
 	name := template.HTMLEscapeString(data.Tunnel.Name)
 	boldName := "<strong>" + name + "</strong>"
+
+	// Before the first reconcile completes, don't claim the tunnel is healthy.
+	if data.Reconcile.Count == 0 {
+		// #nosec G203 -- name is escaped via template.HTMLEscapeString
+		return template.HTML(fmt.Sprintf("Tunnel %s is initializing, please wait...", boldName))
+	}
+
 	if data.Reconcile.LastError != "" {
 		errMsg := template.HTMLEscapeString(data.Reconcile.LastError)
 		// #nosec G203 -- name and errMsg are escaped via template.HTMLEscapeString
