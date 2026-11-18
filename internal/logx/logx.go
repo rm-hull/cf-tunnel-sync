@@ -213,6 +213,8 @@ func processValue(v any) any {
 	switch val := v.(type) {
 	case time.Duration:
 		return val.String()
+	case error:
+		return val.Error()
 	case []slog.Attr:
 		// Expand slog.Group into a flat map
 		result := make(map[string]any, len(val))

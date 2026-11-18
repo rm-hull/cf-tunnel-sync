@@ -3,6 +3,7 @@ package logx_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"testing"
 
@@ -255,6 +256,31 @@ func TestRingBufferGroupValueExpanded(t *testing.T) {
 	require.True(t, ok, "response should be a map[string]any, got %T", record["response"])
 	assert.Equal(t, "3.5ms", response["latency"])
 	assert.Equal(t, float64(1024), response["length"])
+}
+
+func TestRingBufferErrorAttributePreserved(t *testing.T) {
+	var buf bytes.Buffer
+	jsonHandler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+
+	ring := logx.NewRingBufferHandler(10, jsonHandler)
+	logger := slog.New(ring)
+
+	testErr := fmt.Errorf("connection refused")
+	logger.Error("discover rules", "error", testErr)
+
+	records := ring.Records()
+	require.Len(t, records, 1)
+
+	var record map[string]any
+	require.NoError(t, json.Unmarshal(records[0], &record))
+
+	assert.Equal(t, "discover rules", record["msg"])
+	// The error attribute should be a string, not an empty map
+	errVal, ok := record["error"]
+	require.True(t, ok, "error attribute should be present in record")
+	assert.Equal(t, "connection refused", errVal, "error should be the error message string")
 }
 
 func TestRingBufferNestedGroupValueExpanded(t *testing.T) {
