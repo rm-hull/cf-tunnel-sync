@@ -39,6 +39,7 @@ func (s *Server) handleIndex(c *gin.Context) {
 		"formatAttrs":     formatAttrs,
 		"statusClass":     statusClass,
 		"statusLabel":     statusLabel,
+		"levelColor":      levelColor,
 		"last": func(n int, items []LogEvent) []LogEvent {
 			// Filter out http_server component noise
 			filtered := make([]LogEvent, 0, len(items))
@@ -205,6 +206,18 @@ func statusLabel(status string) string {
 		return "Blocked"
 	default:
 		return status
+	}
+}
+
+// levelColor returns a Tailwind color class for a log level.
+func levelColor(level string) string {
+	switch level {
+	case "ERROR":
+		return "text-bad dark:text-bad-dark"
+	case "WARN":
+		return "text-warn dark:text-warn-dark"
+	default:
+		return "text-gray-400"
 	}
 }
 
