@@ -216,6 +216,8 @@ func levelColor(level string) string {
 		return "text-bad dark:text-bad-dark"
 	case "WARN":
 		return "text-warn dark:text-warn-dark"
+	case "DEBUG":
+		return "text-black dark:text-white"
 	default:
 		return "text-gray-400"
 	}
