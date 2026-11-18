@@ -130,7 +130,7 @@ func (a *mobyAPI) Events(ctx context.Context, prefixes []string) EventStream {
 		result := a.client.Events(ctx, mobyclient.EventsListOptions{
 			Filters: filters,
 		})
-		a.log.Debug("Docker events stream opened")
+		a.log.Debug("docker events stream opened")
 
 		eventCount := 0
 		for {
@@ -170,7 +170,7 @@ func (a *mobyAPI) Events(ctx context.Context, prefixes []string) EventStream {
 					a.log.Debug("events error channel closed by Docker client", "events_received", eventCount)
 					return
 				}
-				a.log.Debug("Docker events stream error", "error", err, "events_received", eventCount)
+				a.log.Debug("docker events stream error", "error", err, "events_received", eventCount)
 				select {
 				case errCh <- err:
 				case <-ctx.Done():
